@@ -1,0 +1,13 @@
+# jigsaw things
+*.log
+*.jig
+*.msh
+
+# python things
+__pycache__/
+*.py[cod]
+
+# data files, etc
+*.nc
+*.grd
+*.vtk
