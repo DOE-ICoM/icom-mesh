@@ -31,10 +31,11 @@ These commands will build the "vanilla-100" mesh configuration defined in the `.
     
 initiates the mesh build process, roughly consisting of the following steps:
 
-    1. The local ../USER-MESH-DIRECTORY/compose.py is called to define: the geometry, initial conditions, mesh spacing pattern, etc.
-    2. JIGSAW is called to build the triangular mesh.
-    3. MPAS mesh-tools are called to assemble the MPAS-format data structures.
-    4. Output is exported for the various ESM, FVCOM and ATS model components.
+    The local ../USER-MESH-DIRECTORY/compose.py script is called to define: the geometry, 
+    initial conditions, mesh spacing pattern, etc.
+    JIGSAW is called to build the triangular mesh.
+    MPAS mesh-tools are called to assemble the MPAS-format data structures.
+    Output is exported for the various ESM, FVCOM and ATS model components.
 
 Output is written to `../mesh/USER-MESH-DIRECTORY/out/` with `../mesh/USER-MESH-DIRECTORY/tmp/` used for scratch storage. Various `*.vtk` output is exported, allowing meshes to be visualised with, for example, <a href=https://www.paraview.org/>Paraview</a>.
 
@@ -42,9 +43,13 @@ Output is written to `../mesh/USER-MESH-DIRECTORY/out/` with `../mesh/USER-MESH-
 
 Mesh configurations are defined using a local `compose.py` script, that must contain the following functions:
 
-    compose.setgeom: defines the geometry for the mesh: ellipsoid shape, boundaries, coastlines, stream networks, etc.
-    compose.setspac: defines the spacing pattern for the mesh: the variation in target edge length throughout the domain.
-    compose.setinit: defines the initial conditions: (optional) an initialising mesh object on which subsequent refinement / optimisation operations are based.
+    compose.setgeom: defines the geometry for the mesh: ellipsoid shape, boundaries, 
+                     coastlines, stream networks, etc.
+    compose.setspac: defines the spacing pattern for the mesh: the variation in 
+                     target edge length throughout the domain.
+    compose.setinit: defines the initial conditions: (optional) an initialising mesh 
+                     object on which subsequent refinement / optimisation operations 
+                     are based.
     compose.setopts: defines any runtime meshing options.
 
 This information is used by `JIGSAW` / `MPAS mesh-tools` to build a specific mesh configuration.
