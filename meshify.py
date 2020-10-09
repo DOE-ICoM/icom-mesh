@@ -2,16 +2,22 @@
 import os
 import math
 import time
+import copy
 from importlib import import_module
-
 import numpy as np
+
 import argparse
 import jigsawpy
 
+from util.inpoly2 import inpoly2
+from util.savefvc import savefvc
+from util.saveats import saveats
 
-def meshify(mesh_path="mesh/vanilla_100", 
-            write_esm=True, write_fvc=True, write_ats=True,
-            make_geom=True, make_spac=True, make_init=True, 
+
+def meshify(mesh_path="mesh/vanilla_100",
+            idtag_esm=[+0], idtag_fvc=[-1], idtag_ats=[-1],
+            projector=[0.0, 0.0],
+            make_geom=True, make_spac=True, make_init=True,
             make_opts=True):
     """
     MESHIFY: main call to the ICoM mesh-gen. infrastructure.
@@ -20,87 +26,119 @@ def meshify(mesh_path="mesh/vanilla_100",
        mesh geometry, spacing pattern, initial conditions
        and mesh-gen. parameters.
     2. Call JIGSAW to build the triangulation.
-    3. Call MPAS meshtools to make the MPAS mesh data files.
-    4. (Optionally) export compatible FVCOM and ATS outputs.
+    3. (Optionally) export compatible FVCOM and ATS outputs.
+    4. Call MPAS meshtools to make the MPAS mesh data files.
 
     Authors: Darren Engwirda
 
     """
 
-#---------- call JIGSAW to build the initial triangular mesh
-
-    class obj(object): pass
-    
-    mesh_args = obj()
-    mesh_args.sphere_radius = +6.371E+003
+    class obj(object): pass                 # dummy object
 
     make_bool = obj()
     make_bool.geom = make_geom
     make_bool.init = make_init
     make_bool.spac = make_spac
     make_bool.opts = make_opts
-    
-    runjgsw(mesh_path, mesh_args, make_bool)
+
+#---------- call JIGSAW to build the initial triangular mesh
+
+    mesh, mprj = \
+        runjgsw(mesh_path, make_bool, projector)
+
+#---------- call utilities to write output for ATS and FVCOM
+
+    if (isinstance(idtag_ats, list) and len(idtag_ats) > 0
+            and idtag_ats[0] >= +0):
+
+#-------------------------------------- write output for ATS
+        mout = zipmesh(mprj, idtag_ats)
+
+        saveats(os.path.join(
+            mesh_path, "out", "mesh_ats"), mout)
+
+    if (isinstance(idtag_fvc, list) and len(idtag_fvc) > 0
+            and idtag_fvc[0] >= +0):
+
+#-------------------------------------- write output for FVC
+        mout = zipmesh(mprj, idtag_fvc)
+
+        savefvc(os.path.join(
+            mesh_path, "out", "mesh_fvc"), mout)
 
 #---------- run MPAS meshtools to build MPAS data-structures
 
-   #jigsaw_to_MPAS.jigsaw_to_netcdf(
-   #    msh_filename=os.path.join(mesh_path, "tmp", "mesh.msh"),
-   #    output_name="mesh_triangles.nc", on_sphere=True)
+    if (isinstance(idtag_esm, list) and len(idtag_esm) > 0
+            and idtag_esm[0] >= +0):
 
+#-------------------------------------- write output for ESM
+        pass
+
+    #   jigsaw_to_MPAS.jigsaw_to_netcdf(
+    #       msh_filename=os.path.join(
+    #           mesh_path, "tmp", "mesh.msh"),
+    #       output_name=os.path.join(
+    #           mesh_path, "out", "mesh_triangles.nc"),
+    #       on_sphere=mesh.vert3.size > +0)
 
     return
 
 
-def runjgsw(mesh_path, mesh_args, make_bool):
+def runjgsw(mesh_path, make_bool, projector):
     """
     RUNJGSW: main call to JIGSAW to build the triangulation.
 
     MESH-PATH should point to a user-defined mesh directory,
-    containing the COMPOSE.py template. 
+    containing the COMPOSE.py template.
 
-    Firstly, MESH-PATH/COMPOSE.py is called to build 
+    Firstly, MESH-PATH/COMPOSE.py is called to build
     user-defined geometry, initial conditions, mesh spacing
-    and mesh configuration information.      
+    and mesh configuration information.
 
     The boolean flags MAKE-BOOL control whether mesh
     information is built from scratch, or if an exitsing an
-    existing file is to be used. For example, setting 
+    existing file is to be used. For example, setting
     MAKE-BOOL.SPAC = FALSE relies on an existing spacing
     pattern be available in MESH-PATH/tmp/.
 
-    This information is written to MESH-PATH/tmp/ to be 
+    This information is written to MESH-PATH/tmp/ to be
     accessed by subsequent calls to JIGSAW.
 
-    Finally, JIGSAW is run to build the triangular mesh, 
-    calling either the multi-level (TETRIS) or single-level 
-    (JIGSAW) algorithms. 
+    Finally, JIGSAW is run to build the triangular mesh,
+    calling either the multi-level (TETRIS) or single-level
+    (JIGSAW) algorithms. Cells are assigned ID-tags via
+    the polygon/regions defined in GEOM.BOUNDS.
+
+    Returns full-dimensional and 2d-projected msh_t objects.
 
     Authors: Darren Engwirda
 
     """
-    
+
     mesh = jigsawpy.jigsaw_msh_t()
+    mprj = jigsawpy.jigsaw_msh_t()
+    gprj = jigsawpy.jigsaw_msh_t()
 
 #------------------------------------ setup via user COMPOSE
-    
-    base = mesh_path.replace(os.path.sep, ".")
-    
-    if (make_bool.geom): 
+
+    base = \
+        mesh_path.replace(os.path.sep, ".")
+
+    if (make_bool.geom):
         geom = getattr(import_module(
-            base + ".compose"), "setgeom")(mesh_args)
+            base + ".compose"), "setgeom")()
 
-    if (make_bool.spac): 
+    if (make_bool.spac):
         spac = getattr(import_module(
-            base + ".compose"), "setspac")(mesh_args)
+            base + ".compose"), "setspac")()
 
-    if (make_bool.init): 
+    if (make_bool.init):
         init = getattr(import_module(
-            base + ".compose"), "setinit")(mesh_args)
+            base + ".compose"), "setinit")()
 
-    if (make_bool.opts): 
+    if (make_bool.opts):
         opts = getattr(import_module(
-            base + ".compose"), "setopts")(mesh_args)
+            base + ".compose"), "setopts")()
 
 #------------------------------------ setup files for JIGSAW
 
@@ -119,12 +157,16 @@ def runjgsw(mesh_path, mesh_args, make_bool):
     opts.mesh_file = os.path.join(
         mesh_path, "tmp", "mesh.msh")
 
-    opts._vtk_file = os.path.join(      # vis. in paraview
-        mesh_path, "out", "mesh.vtk")
+    opts.hfun_tags = "precision = 9"    # less float prec.
 
-    jigsawpy.savemsh(opts.geom_file, geom)
-    jigsawpy.savemsh(opts.hfun_file, spac)
-    jigsawpy.savemsh(opts.init_file, init)
+    jigsawpy.savemsh(opts.geom_file, geom,
+                     opts.geom_tags)
+
+    jigsawpy.savemsh(opts.hfun_file, spac,
+                     opts.hfun_tags)
+
+    jigsawpy.savemsh(opts.init_file, init,
+                     opts.init_tags)
 
 #------------------------------------ make mesh using JIGSAW
 
@@ -174,7 +216,28 @@ def runjgsw(mesh_path, mesh_args, make_bool):
         ttoc = time.time()
 
         print("CPUSEC =", (ttoc - ttic))
-        
+
+#------------------------------------ form local projections
+
+    gprj = copy.deepcopy(geom)          # local 2d objects
+    mprj = copy.deepcopy(mesh)
+
+    if (mesh.vert3.size > +0):
+        project(geom, mesh, gprj, mprj, projector)
+
+#------------------------------------ assign IDtag's to cell
+
+    if (geom.bound is not None and
+            geom.bound.size > +0):      # tags per polygon
+
+        imin = np.amin(geom.bound["IDtag"])
+        imax = np.amax(geom.bound["IDtag"])
+
+        for itag in range(
+                imin + 0, imax + 1):
+
+            tagcell(geom, mesh, gprj, mprj, itag)
+
 #------------------------------------ check mesh for quality
 
     cost = jigsawpy.triscr2(            # quality metrics!
@@ -207,62 +270,218 @@ def runjgsw(mesh_path, mesh_args, make_bool):
 
 #------------------------------------ save mesh for Paraview
 
-    jigsawpy.savevtk(opts._vtk_file, mesh)
+    jigsawpy.savevtk(os.path.join(
+        mesh_path, "out", "geom.vtk"), geom)
+    jigsawpy.savevtk(os.path.join(
+        mesh_path, "out", "spac.vtk"), spac)
+    jigsawpy.savevtk(os.path.join(
+        mesh_path, "out", "init.vtk"), init)
+    jigsawpy.savevtk(os.path.join(
+        mesh_path, "out", "mesh.vtk"), mesh)
+
+    jigsawpy.savevtk(os.path.join(
+        mesh_path, "out", "geom_prj.vtk"), gprj)
+    jigsawpy.savevtk(os.path.join(
+        mesh_path, "out", "mesh_prj.vtk"), mprj)
+
+    return mesh, mprj
+
+
+def project(geom, mesh, gprj, mprj, pmid):
+    """
+    PROJECT: projection of GEOM/MESH objects to a 2d. plane.
+
+    Modifies GPRJ, MPRJ objects "inplace".
+
+    Authors: Darren Engwirda
+
+    """
+
+    proj = jigsawpy.jigsaw_prj_t()
+
+    mprj.point = np.full(
+        mesh.point.size, +0, dtype=mprj.VERT2_t)
+
+    mprj.point["coord"] = \
+        jigsawpy.R3toS2(
+            geom.radii, mesh.point["coord"])
+
+    proj.prjID = "stereographic"
+    proj.radii = np.mean(geom.radii)
+    proj.xbase = pmid[0] * np.pi / +180.
+    proj.ybase = pmid[1] * np.pi / +180.
+
+    jigsawpy.project(gprj, proj, "fwd")
+    jigsawpy.project(mprj, proj, "fwd")
 
     return
 
 
-if (__name__ == "__main__"): 
+def tagcell(geom, mesh, gprj, mprj, itag):
+    """
+    TAGCELL: assign ID-tags to mesh cells based-on polygons
+    defined in GEOM.BOUND.
+
+    Modifies MESH, MPRJ objects "inplace".
+
+    Authors: Darren Engwirda
+
+    """
+
+    this = geom.bound["IDtag"] == itag
+    cell = geom.bound["index"][this]
+
+    loop = geom.edge2["index"][cell, :]
+
+#------------------------------------ compute cell "centres"
+    ball = jigsawpy.tribal2(
+        mprj.point["coord"], mesh.tria3["index"])
+
+#------------------------------------ calc. in-polygon tests
+    tmsk, _ = inpoly2(
+        ball[:, :-1], gprj.point["coord"], loop)
+
+    vmsk, _ = inpoly2(mprj.point["coord"],
+                      gprj.point["coord"], loop)
+
+    vbnd = np.full(
+        mesh.point.size, False, dtype=np.bool)
+
+    vbnd[mesh.edge2["index"].flatten()] = True
+
+    vmsk[vbnd] = False
+
+    tbnd = np.logical_and.reduce((      # all vert. on bnd
+        vbnd[mesh.tria3["index"][:, 0]],
+        vbnd[mesh.tria3["index"][:, 1]],
+        vbnd[mesh.tria3["index"][:, 2]]))
+
+    tmsk[np.logical_not(tbnd)] = False
+
+    mask = np.logical_or.reduce((       # vert. or cell in
+        vmsk[mesh.tria3["index"][:, 0]],
+        vmsk[mesh.tria3["index"][:, 1]],
+        vmsk[mesh.tria3["index"][:, 2]],
+        tmsk))
+
+#------------------------------------ assign IDtags to cells
+    mesh.tria3["IDtag"][mask == 1] = itag
+    mprj.tria3["IDtag"][mask == 1] = itag
+
+    return
+
+
+def zipmesh(mesh, tags):
+    """
+    ZIPMESH: "zip" a mesh down to just the verts/edges/cells
+    associated with the list of ID's in TAGS.
+
+    Returns a new "zipped" msh_t object.
+
+    Authors: Darren Engwirda
+
+    """
+
+    mout = jigsawpy.jigsaw_msh_t()
+
+    keep_cell = np.full(
+        mesh.tria3.size, False, dtype=np.bool)
+    keep_edge = np.full(
+        mesh.edge2.size, False, dtype=np.bool)
+    keep_vert = np.full(
+        mesh.point.size, False, dtype=np.bool)
+
+#------------------------------------ "flag" tagged entities
+    for itag in tags:
+
+        keep_cell[mesh.tria3["IDtag"] == itag] = True
+
+    keep_vert[mesh.tria3[
+        "index"][keep_cell].flatten()] = True
+
+    keep_edge = np.logical_and.reduce((
+        keep_vert[mesh.edge2["index"][:, 0]],
+        keep_vert[mesh.edge2["index"][:, 1]])
+    )
+
+    mout.point = mesh.point[keep_vert]
+    mout.edge2 = mesh.edge2[keep_edge]
+    mout.tria3 = mesh.tria3[keep_cell]
+
+#------------------------------------ update vertex indexing
+    redo = \
+        np.zeros(mesh.point.size, dtype=np.int32)
+
+    redo[keep_vert] = \
+        np.arange(0, np.count_nonzero(keep_vert))
+
+    mout.edge2["index"] = redo[mout.edge2["index"]]
+    mout.tria3["index"] = redo[mout.tria3["index"]]
+
+    return mout
+
+
+if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
-        description=__doc__, 
+        description=__doc__,
         formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument(
-        "--mesh_path", dest="mesh_path", type=str,
+        "--mesh-path", dest="mesh_path", type=str,
         required=False, help="Path to user-def. mesh-dir.",
         default=os.path.join("mesh", "vanilla_100"))
 
     parser.add_argument(
-        "--write_esm", dest="write_esm", type=bool,
-        required=False, help="TRUE to write ESM data file",
-        default=True)
+        "--IDtag-ESM", dest="idtag_esm",
+        type=lambda s: [int(it) for it in s.split(",")],
+        required=False, help="Mesh ID tags for ESM output",
+        default="+0")
 
     parser.add_argument(
-        "--write_fvc", dest="write_fvc", type=bool,
-        required=False, help="TRUE to write FVC data file",
-        default=True)
+        "--IDtag-FVC", dest="idtag_fvc",
+        type=lambda s: [int(it) for it in s.split(",")],
+        required=False, help="Mesh ID tags for FVC output",
+        default="-1")
 
     parser.add_argument(
-        "--write_ats", dest="write_ats", type=bool,
-        required=False, help="TRUE to write ATS data file",
-        default=True)
+        "--IDtag-ATS", dest="idtag_ats",
+        type=lambda s: [int(it) for it in s.split(",")],
+        required=False, help="Mesh ID tags for ATS output",
+        default="-1")
 
     parser.add_argument(
-        "--make_geom", dest="make_geom", type=bool,
+        "--projector", dest="projector",
+        type=lambda s: [float(it) for it in s.split(",")],
+        required=False, help="[lon, lat] for 2-projection",
+        default="-75.00, +39.00")
+
+    parser.add_argument(
+        "--make-geom", dest="make_geom", type=bool,
         required=False, help="TRUE to re-build GEOM. data",
         default=True)
 
     parser.add_argument(
-        "--make_spac", dest="make_spac", type=bool,
+        "--make-spac", dest="make_spac", type=bool,
         required=False, help="TRUE to re-build SPAC. data",
         default=True)
 
     parser.add_argument(
-        "--make_init", dest="make_init", type=bool,
+        "--make-init", dest="make_init", type=bool,
         required=False, help="TRUE to re-build INIT. data",
         default=True)
 
     parser.add_argument(
-        "--make_opts", dest="make_opts", type=bool,
+        "--make-opts", dest="make_opts", type=bool,
         required=False, help="TRUE to re-build OPTS. data",
         default=True)
 
     args = parser.parse_args()
 
     meshify(mesh_path=args.mesh_path,
-            write_esm=args.write_esm,
-            write_fvc=args.write_fvc,
-            write_ats=args.write_ats,
+            idtag_esm=args.idtag_esm,
+            idtag_fvc=args.idtag_fvc,
+            idtag_ats=args.idtag_ats,
+            projector=args.projector,
             make_geom=args.make_geom,
             make_spac=args.make_spac,
             make_init=args.make_init,

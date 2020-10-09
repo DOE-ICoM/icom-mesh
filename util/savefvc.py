@@ -2,8 +2,7 @@
 import warnings
 from pathlib import Path
 
-from jigsawpy.msh_t import jigsaw_msh_t
-from jigsawpy.certify import certify
+from jigsawpy import jigsaw_msh_t, certify
 
 
 def save_mesh_file(mesh, fptr):
@@ -17,8 +16,8 @@ def save_mesh_file(mesh, fptr):
         for ipos in range(mesh.vert2.size):
             fptr.write(
                 f"{ipos}\t"
-                f"{xpts[ipos, 0]:.18G}\t"
-                f"{xpts[ipos, 1]:.18G}\n")
+                f"{xpts[ipos, 0]:.17g}\t"
+                f"{xpts[ipos, 1]:.17g}\n")
 
     if (mesh.vert3 is not None and
             mesh.vert3.size != +0):
@@ -92,6 +91,8 @@ def savefvc(name, mesh):
     Data in MESH is written as-needed -- any objects defined
     will be saved to file (if supported).
 
+    Authors: Darren Engwirda
+
     """
 
     if (not isinstance(name, str)):
@@ -104,8 +105,7 @@ def savefvc(name, mesh):
 
     fext = Path(name).suffix
 
-    if (fext.strip() != ".dat"):
-        name = name + ".dat"
+    if (fext.strip() != ".dat"): name += ".dat"
 
     kind = mesh.mshID.lower()
 
