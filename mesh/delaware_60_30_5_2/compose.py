@@ -92,8 +92,8 @@ def setspac():
     dhdx_lim = 0.0625                   # |dH/dx| thresh
 
     fade_pos = [-75.2316, 39.1269]
-    fade_len = 600.
-    fade_gap = 300.
+    fade_len = 800.
+    fade_gap = 400.
 
     spac = jigsawpy.jigsaw_msh_t()
 
@@ -107,8 +107,8 @@ def setspac():
 
     print("BUILDING MESH SPAC.")
 
-    print("Loading elev. data-sets...")
-
+    print("Loading elevation assets...")
+    
     data = nc.Dataset(os.path.join(
         "data",
         "etopo_gebco", "etopo_gebco_tiled.nc"), "r")
@@ -198,7 +198,7 @@ def setspac():
 
 #------------------------------------ push watershed(s) = 5.
 
-    print("Compute watershed h(x)...")
+    print("Compute watersheds h(x)...")
 
     shed = np.full(
         (grid.shape[0]), False, dtype=bool)

@@ -3,6 +3,7 @@
 *.jig
 *.msh
 *.vtk
+*.dat
 
 # python things
 __pycache__/

@@ -3,15 +3,12 @@ import os
 import time
 import copy
 import numpy as np
-from scipy import spatial
-from scipy import interpolate
 import jigsawpy
 import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 
 from util.loadshp import loadshp
-from util.loadgeo import loadgeo
-from util.inpoly2 import inpoly2
-from util.utility import addpoly, addline, innerto, zipmesh
+from util.spacing import zipnear
+from util.utility import addpoly, addline, innerto
 
 
 """
@@ -208,52 +205,6 @@ def setinit():
     geom = copy.deepcopy(GEOM[0])
     spac = copy.deepcopy(SPAC[0])
 
-#------------------------------------ find dist. to geometry
-
-    tree = spatial.cKDTree(
-        jigsawpy.S2toR3(
-            geom.radii, geom.point["coord"]))
-
-    dmax = +2. * np.max(spac.value)
-
-    dist, _ = tree.query(
-        init.point["coord"],
-        eps=0.0, distance_upper_bound=dmax)
-
-    apos = jigsawpy.R3toS2(
-        geom.radii, init.point["coord"][:])
-
-#------------------------------------ zip init. if too close
-
-    hfun = interpolate.RectBivariateSpline(
-        spac.ygrid, spac.xgrid, spac.value)
-
-    hval = hfun(
-        apos[:, 1], apos[:, 0], grid=False)
-
-    keep = dist > hval * +3.00
-
-    if (init.edge2 is not None and
-            init.edge2.size > +0):
-
-        mask = np.logical_and.reduce((
-            keep[init.edge2["index"][:, 0]],
-            keep[init.edge2["index"][:, 1]]
-        ))
-
-        init.edge2 = init.edge2[mask]
-
-    if (init.tria3 is not None and
-            init.tria3.size > +0):
-
-        mask = np.logical_and.reduce((
-            keep[init.tria3["index"][:, 0]],
-            keep[init.tria3["index"][:, 1]],
-            keep[init.tria3["index"][:, 2]]
-        ))
-
-        init.tria3 = init.tria3[mask]
-
-    zipmesh(init)
+    zipnear(init, geom, spac, near=+10.00)
 
     return init

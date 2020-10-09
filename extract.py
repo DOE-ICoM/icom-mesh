@@ -34,7 +34,7 @@ def extract(repo="DOE-ICoM/icom-mesh-data", vtag="v0.1.0"):
                 zip_func.close()
 
         print("")
-        print("Done downloading + unpacking data assets.")
+        print("Done downloading + unpacking assets.")
         print("")
 
     finally:
