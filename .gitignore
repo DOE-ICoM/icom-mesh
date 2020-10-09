@@ -20,5 +20,5 @@ var/
 *.egg
 
 # data files, etc
-data/
-!data/*.keep
+data/*
+!data/.keep
