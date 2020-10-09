@@ -2,7 +2,7 @@
 import numpy as np
 from scipy import sparse
 
-import jigsawpy
+from jigsawpy import certify, orient1
 
 
 def in_tri2(ppos, tri2, test, rtol):
@@ -14,17 +14,17 @@ def in_tri2(ppos, tri2, test, rtol):
 
     TEST = np.tile(test, (tri2.shape[0], 1))
 
-    sgn1 = jigsawpy.orient1(
+    sgn1 = orient1(
         ppos[tri2[:, +0], :],
         ppos[tri2[:, +1], :], TEST
     )
 
-    sgn2 = jigsawpy.orient1(
+    sgn2 = orient1(
         ppos[tri2[:, +1], :],
         ppos[tri2[:, +2], :], TEST
     )
 
-    sgn3 = jigsawpy.orient1(
+    sgn3 = orient1(
         ppos[tri2[:, +2], :],
         ppos[tri2[:, +0], :], TEST
     )
@@ -48,9 +48,11 @@ def cullfvc(mesh, seed):
 
     Any edge elements defined in MESH are also culled-away.
 
+    Authors: Darren Engwirda
+
     """
 
-    jigsawpy.certify(mesh)
+    certify(mesh)
 
     edge = np.empty((0, 3), dtype=np.int32)
 

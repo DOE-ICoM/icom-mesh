@@ -3,8 +3,17 @@ import numpy as np
 
 import jigsawpy
 
+"""
+VANILLA-100: "vanilla" quasi-uniform global config., h=100km
 
-def setgeom(args):
+Authors: Darren Engwirda
+
+"""
+
+FULL_SPHERE_RADIUS = +6.371E+003
+
+
+def setgeom():
 
     geom = jigsawpy.jigsaw_msh_t()
 
@@ -12,12 +21,12 @@ def setgeom(args):
 
     geom.mshID = "ellipsoid-mesh"
     geom.radii = np.full(
-        3, args.sphere_radius, dtype=geom.REALS_t)
+        3, FULL_SPHERE_RADIUS, dtype=geom.REALS_t)
 
     return geom
 
 
-def setinit(args):
+def setinit():
 
     init = jigsawpy.jigsaw_msh_t()
 
@@ -28,7 +37,7 @@ def setinit(args):
     return init
 
 
-def setopts(args):
+def setopts():
 
     opts = jigsawpy.jigsaw_jig_t()
 
@@ -49,7 +58,7 @@ def setopts(args):
     return opts
 
 
-def setspac(args):
+def setspac():
 
     spac = jigsawpy.jigsaw_msh_t()
 
@@ -57,14 +66,14 @@ def setspac(args):
 
     spac.mshID = "ellipsoid-grid"
     spac.radii = np.full(
-        3, args.sphere_radius, dtype=spac.REALS_t)
+        3, FULL_SPHERE_RADIUS, dtype=spac.REALS_t)
 
     spac.xgrid = np.linspace(
         -1. * np.pi, +1. * np.pi, 360)
 
     spac.ygrid = np.linspace(
-        -.5 * np.pi, +.5 * np.pi, 180) 
-    
+        -.5 * np.pi, +.5 * np.pi, 180)
+
     spac.value = np.full(
         (180, 360), +1.0E+002, dtype=spac.REALS_t)
 
