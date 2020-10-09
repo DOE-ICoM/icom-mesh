@@ -8,7 +8,7 @@ The "unified" multi-model meshing workflow.
 
     clone/download + unpack this repository
     python extract.py
-    python meshify.py --mesh_path="PATH-TO-USER-MESH-DIRECTORY"
+    python meshify.py --mesh-path="PATH-TO-USER-MESH-DIRECTORY"
     
 Dependencies can either be built directly from src, or installed using the <a href="https://anaconda.org/conda-forge/">`conda`</a> package manager (highly recommended!):
 
@@ -21,7 +21,7 @@ Each time you want to use `ICoM-MESH` first activate the environment using: `con
 Once activated, the various command-line utilities and `Python` packages will be available to the `ICoM-MESH` workflows contained in this repository. For example:
 
     conda activate icom_mesh_plus
-    python meshify.py --mesh_path="mesh/vanilla_100"
+    python meshify.py --mesh-path="mesh/vanilla_100"
     conda deactivate
 
 These commands will build the "vanilla-100" mesh configuration defined in the `../mesh/vanilla_100` directory.
@@ -30,7 +30,7 @@ These commands will build the "vanilla-100" mesh configuration defined in the `.
 
 `ICoM-MESH` defines various mesh configurations, with each `../mesh/USER-MESH-DIRECTORY` containing the user-defined script `compose.py` used to design a particular grid. Running:
 
-    python meshify.py --mesh_path="PATH-TO-USER-MESH-DIRECTORY"
+    python meshify.py --mesh-path="PATH-TO-USER-MESH-DIRECTORY"
     
 initiates the mesh build process, roughly consisting of the following steps:
 
