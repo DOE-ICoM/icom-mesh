@@ -6,4 +6,4 @@ A simple variable-resolution Delaware-centric configuration, combining the `60-t
     python meshify.py --mesh-path="mesh/delaware_60_30_5_2"
     conda deactivate
 
-will build the mesh in the `../delaware_60_30_5_2` directory. Output in `../delaware_60_30_5_2/out`. Requires various elevation, coastline, watershed and ocean-halo datasets.
+will build the mesh in the `../delaware_60_30_5_2` directory. Output is written to `../delaware_60_30_5_2/out`. Requires various elevation, coastline, watershed and ocean-halo datasets.
