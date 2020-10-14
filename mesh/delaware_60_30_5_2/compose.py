@@ -72,10 +72,10 @@ def setopts():
 
     opts.bisection = -1                 # call heutristic!
 
-#   opts.optm_kern = "cvt+dqdx"
+    opts.optm_kern = "cvt+dqdx"
 
     opts.optm_qlim = +9.5E-01           # tighter opt. tol
-    opts.optm_iter = +64
+    opts.optm_iter = +256
     opts.optm_qtol = +1.0E-05
 
     return opts
@@ -92,8 +92,8 @@ def setspac():
     dhdx_lim = 0.0625                   # |dH/dx| thresh
 
     fade_pos = [-75.2316, 39.1269]
-    fade_len = 800.
-    fade_gap = 400.
+    fade_len = 700.
+    fade_gap = 350.
 
     spac = jigsawpy.jigsaw_msh_t()
 

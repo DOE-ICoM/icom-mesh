@@ -144,7 +144,7 @@ def setopts():
     opts.mesh_rad2 = +1.20
     opts.mesh_eps1 = +0.67
 
-#   opts.optm_kern = "cvt+dqdx"
+    opts.optm_kern = "cvt+dqdx"
 
     opts.optm_qlim = +9.5E-01           # tighter opt. tol
     opts.optm_iter = +64
@@ -173,7 +173,7 @@ def setspac():
 
         raise Exception(
             "File not found: first run delaware_60_30_5_2"
-            "to form initial conditions!")
+            " to form initial conditions!")
 
     SPAC[0] = spac                      # save a "pointer"
 
@@ -200,11 +200,11 @@ def setinit():
 
         raise Exception(
             "File not found: first run delaware_60_30_5_2"
-            "to form initial conditions!")
+            " to form initial conditions!")
 
     geom = copy.deepcopy(GEOM[0])
     spac = copy.deepcopy(SPAC[0])
 
-    zipnear(init, geom, spac, near=+10.00)
+    zipnear(init, geom, spac, near=+1.E+01)
 
     return init

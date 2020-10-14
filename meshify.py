@@ -12,10 +12,11 @@ import jigsawpy
 from util.inpoly2 import inpoly2
 from util.savefvc import savefvc
 from util.saveats import saveats
+from util.saveesm import saveesm
 
 
 def meshify(mesh_path="mesh/vanilla_100",
-            idtag_esm=[+0], idtag_fvc=[-1], idtag_ats=[-1],
+            idtag_esm=[-1], idtag_fvc=[-1], idtag_ats=[-1],
             projector=[0.0, 0.0],
             make_geom=True, make_spac=True, make_init=True,
             make_opts=True):
@@ -43,7 +44,7 @@ def meshify(mesh_path="mesh/vanilla_100",
 
 #---------- call JIGSAW to build the initial triangular mesh
 
-    mesh, mprj = \
+    geom, gprj, mesh, mprj = \
         runjgsw(mesh_path, make_bool, projector)
 
 #---------- call utilities to write output for ATS and FVCOM
@@ -54,8 +55,8 @@ def meshify(mesh_path="mesh/vanilla_100",
 #-------------------------------------- write output for ATS
         mout = zipmesh(mprj, idtag_ats)
 
-        saveats(os.path.join(
-            mesh_path, "out", "mesh_ats"), mout)
+    #   saveats(os.path.join(
+    #       mesh_path, "out", "mesh_ats"), mout)
 
     if (isinstance(idtag_fvc, list) and len(idtag_fvc) > 0
             and idtag_fvc[0] >= +0):
@@ -63,8 +64,8 @@ def meshify(mesh_path="mesh/vanilla_100",
 #-------------------------------------- write output for FVC
         mout = zipmesh(mprj, idtag_fvc)
 
-        savefvc(os.path.join(
-            mesh_path, "out", "mesh_fvc"), mout)
+    #   savefvc(os.path.join(
+    #       mesh_path, "out", "mesh_fvc"), mout)
 
 #---------- run MPAS meshtools to build MPAS data-structures
 
@@ -72,14 +73,7 @@ def meshify(mesh_path="mesh/vanilla_100",
             and idtag_esm[0] >= +0):
 
 #-------------------------------------- write output for ESM
-        pass
-
-    #   jigsaw_to_MPAS.jigsaw_to_netcdf(
-    #       msh_filename=os.path.join(
-    #           mesh_path, "tmp", "mesh.msh"),
-    #       output_name=os.path.join(
-    #           mesh_path, "out", "mesh_triangles.nc"),
-    #       on_sphere=mesh.vert3.size > +0)
+        saveesm(mesh_path, geom, mesh)
 
     return
 
@@ -284,7 +278,7 @@ def runjgsw(mesh_path, make_bool, projector):
     jigsawpy.savevtk(os.path.join(
         mesh_path, "out", "mesh_prj.vtk"), mprj)
 
-    return mesh, mprj
+    return geom, gprj, mesh, mprj
 
 
 def project(geom, mesh, gprj, mprj, pmid):
@@ -435,7 +429,7 @@ if (__name__ == "__main__"):
         "--IDtag-ESM", dest="idtag_esm",
         type=lambda s: [int(it) for it in s.split(",")],
         required=False, help="Mesh ID tags for ESM output",
-        default="+0")
+        default="-1")
 
     parser.add_argument(
         "--IDtag-FVC", dest="idtag_fvc",
