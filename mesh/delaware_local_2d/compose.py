@@ -1,27 +1,20 @@
 
 import os
 import time
+import copy
 import numpy as np
-from scipy.ndimage import median_filter
 import netCDF4 as nc
 import jigsawpy
 import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 
-from util.loadshp import loadshp
-from util.loadgeo import loadgeo
 from util.inpoly2 import inpoly2
-from util.spacing import sphdist, blender
+from util.loadshp import loadshp
+from util.utility import addpoly, addline, innerto
 
 
 """
-DELAWARE-60-30-5-2: a variable-res. Delaware config., inc.:
-    - ECC-60-to-30 (global ocean)
-    - 45km (global land)
-    - 30km (North Atlantic ocean)
-    - 5.km (Delaware, etc watersheds)
-    - 2.km (Delaware coastline + PFZ)
-
-Authors: Darren Engwirda
+DELAWARE-LOCAL-2D: boundary-aligned mesh of Delaware-centric 
+watersheds, in a local 2d stereographic plane:
 
 """
 
@@ -29,20 +22,80 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 TDIR = os.path.join(HERE, "tmp")
 ODIR = os.path.join(HERE, "out")
 
+GEOM = [jigsawpy.jigsaw_msh_t()]
+SPAC = [jigsawpy.jigsaw_msh_t()]
+
 FULL_SPHERE_RADIUS = +6.371E+003
+
+PROJ_CENTRE = [-75.2316, 39.1269]
+
+
+def filt_narivs(feat):
+
+    return feat["properties"]["UP_CELLS"] > 12500
 
 
 def setgeom():
 
     geom = jigsawpy.jigsaw_msh_t()
+    poly = jigsawpy.jigsaw_msh_t()
 
 #------------------------------------ define JIGSAW geometry
 
+    geom.mshID = "euclidean-mesh"
+    
+#------------------------------------ set watershed boundary
+
     print("BUILDING MESH GEOM.")
 
-    geom.mshID = "ellipsoid-mesh"
-    geom.radii = np.full(
-        +3, FULL_SPHERE_RADIUS, dtype=geom.REALS_t)
+    filename = os.path.join(
+        "data",
+        "NHD_H_0204_HU4_Shape", "Shape", "WBDHU4.shp")
+
+    loadshp(filename, poly)
+
+    poly.point["coord"] *= np.pi / +180.
+
+    addpoly(geom, poly, +1)
+
+    filename = os.path.join(
+        "data",
+        "NHD_H_0205_HU4_Shape", "Shape", "WBDHU4.shp")
+
+    loadshp(filename, poly)
+
+    poly.point["coord"] *= np.pi / +180.
+
+    addpoly(geom, poly, +2)
+    
+#------------------------------------ approx. stream network
+    filename = os.path.join(
+        "data", "namerica_rivers", "narivs.shp")
+
+    loadshp(filename, poly, filt_narivs)
+
+    poly.point["coord"] *= np.pi / +180.
+
+    itag = innerto(poly.vert2["coord"], geom)
+
+    keep = np.logical_and.reduce((
+        itag[poly.edge2["index"][:, 0]] > +0,
+        itag[poly.edge2["index"][:, 1]] > +0
+    ))
+    poly.edge2 = poly.edge2[keep]
+
+    addline(geom, poly, +0)
+
+#------------------------------------ proj. to local 2-plane
+    proj = jigsawpy.jigsaw_prj_t()
+    proj.prjID = "stereographic"
+    proj.radii = FULL_SPHERE_RADIUS
+    proj.xbase = PROJ_CENTRE[0] * np.pi / +180.
+    proj.ybase = PROJ_CENTRE[1] * np.pi / +180.
+
+    jigsawpy.project(geom, proj, "fwd")
+
+    GEOM[0] = geom                      # save a "pointer"
 
     return geom
 
@@ -70,12 +123,15 @@ def setopts():
 
     opts.mesh_dims = +2                 # 2-dim. simplexes
 
-    opts.bisection = -1                 # call heutristic!
+    opts.bisection = +0                 # just single-lev.
 
-    opts.optm_kern = "cvt+dqdx"
+    opts.mesh_rad2 = +1.20
+    opts.mesh_eps1 = +0.67
+
+#   opts.optm_kern = "cvt+dqdx"
 
     opts.optm_qlim = +9.5E-01           # tighter opt. tol
-    opts.optm_iter = +256
+    opts.optm_iter = +64
     opts.optm_qtol = +1.0E-05
 
     return opts
@@ -83,22 +139,19 @@ def setopts():
 
 def setspac():
 
-    spac_ocn = 30.                      # regional ocn. km
-    spac_1_m = 2.                       # sqrt(H) ocn. km
-    spac_lnd = 45.                      # global land km
     spac_wbd = 5.                       # watershed km
     spac_pfz = 2.                       # PFZ km
     elev_pfz = 25.                      # PFZ elev. thresh
     dhdx_lim = 0.0625                   # |dH/dx| thresh
 
-    fade_pos = [-75.2316, 39.1269]
-    fade_len = 700.
-    fade_gap = 350.
+    bbox = [-80., 35., -70., 45.]
 
     spac = jigsawpy.jigsaw_msh_t()
 
     opts = jigsawpy.jigsaw_jig_t()
     poly = jigsawpy.jigsaw_msh_t()
+
+    geom = GEOM[0]
 
     opts.jcfg_file = os.path.join(TDIR, "opts.jig")
     opts.hfun_file = os.path.join(TDIR, "spac.msh")
@@ -125,76 +178,32 @@ def setspac():
     spac.ygrid = np.array(
         data.variables["y"][:], dtype=spac.REALS_t)
 
+    xmsk = np.logical_and.reduce((
+        spac.xgrid >= bbox[0] - 1.,
+        spac.xgrid <= bbox[2] + 1.
+    ))
+
+    ymsk = np.logical_and.reduce((
+        spac.ygrid >= bbox[1] - 1.,
+        spac.ygrid <= bbox[3] + 1.
+    ))
+
+    spac.xgrid = spac.xgrid[xmsk]
+    spac.ygrid = spac.ygrid[ymsk]
+    zlev = zlev[:, xmsk]
+    zlev = zlev[ymsk, :]
+    
     spac.xgrid *= np.pi / +180.
     spac.ygrid *= np.pi / +180.
 
     xgrd, ygrd = np.meshgrid(spac.xgrid, spac.ygrid)
 
+    spac.value = +10. * np.ones(
+        (spac.ygrid.size, spac.xgrid.size))
+
     grid = np.concatenate((             # to [x, y] list
         xgrd.reshape((xgrd.size, +1)),
         ygrd.reshape((ygrd.size, +1))), axis=+1)
-
-#------------------------------------ global ocn ec-60-to-30
-
-    print("Compute global ocean h(x)...")
-
-    vals = \
-        mdt.EC_CellWidthVsLat(spac.ygrid * 180. / np.pi)
-
-    vals = np.reshape(vals, (spac.ygrid.size, 1))
-
-    spac.value = np.array(np.tile(
-        vals, (1, spac.xgrid.size)), dtype=spac.REALS_t)
-
-#------------------------------------ region ocn "eddy" halo
-
-    filename = os.path.join(
-        "data",
-        "na_ocean_halo", "na_ocean_halo.geojson")
-
-    loadgeo(filename, poly)
-
-    poly.point["coord"] *= np.pi / +180.
-
-    mask, _ = inpoly2(
-        grid, poly.point["coord"], poly.edge2["index"])
-
-    mask = np.reshape(mask, spac.value.shape)
-
-    mask = np.logical_and(mask, zlev <= +0.0)
-
-    spac.value[mask] = \
-        np.minimum(spac_ocn, spac.value[mask])
-
-#------------------------------------ coastal ocn heuristics
-
-    mask = zlev <= +0.0
-
-    hval = np.sqrt(np.maximum(-zlev, +0.0))
-    hval = np.maximum(
-        spac_1_m, hval / np.sqrt(+1.0) / spac_1_m)
-
-    dist = sphdist(
-        FULL_SPHERE_RADIUS, grid[:, 0], grid[:, 1],
-        fade_pos[0] * np.pi / 180.,
-        fade_pos[1] * np.pi / 180.)
-    dist = np.reshape(dist, spac.value.shape)
-
-    hval = blender(
-        hval, spac.value, dist, fade_len, fade_gap)
-
-    spac.value[mask] = \
-        np.minimum(hval[mask], spac.value[mask])
-
-#------------------------------------ global lnd const. = 45
-
-    print("Compute global land h(x)...")
-
-    halo = +9                           # filter islands
-
-    zmed = median_filter(zlev, size=halo, mode="wrap")
-
-    spac.value[zmed >= 0.0] = spac_lnd
 
 #------------------------------------ push watershed(s) = 5.
 
@@ -219,45 +228,6 @@ def setspac():
     filename = os.path.join(
         "data",
         "NHD_H_0205_HU4_Shape", "Shape", "WBDHU4.shp")
-
-    loadshp(filename, poly)
-
-    poly.point["coord"] *= np.pi / +180.
-
-    mask, _ = inpoly2(
-        grid, poly.point["coord"], poly.edge2["index"])
-
-    shed[mask] = True
-
-    filename = os.path.join(
-        "data",
-        "NHD_H_0206_HU4_Shape", "Shape", "WBDHU4.shp")
-
-    loadshp(filename, poly)
-
-    poly.point["coord"] *= np.pi / +180.
-
-    mask, _ = inpoly2(
-        grid, poly.point["coord"], poly.edge2["index"])
-
-    shed[mask] = True
-
-    filename = os.path.join(
-        "data",
-        "NHD_H_0207_HU4_Shape", "Shape", "WBDHU4.shp")
-
-    loadshp(filename, poly)
-
-    poly.point["coord"] *= np.pi / +180.
-
-    mask, _ = inpoly2(
-        grid, poly.point["coord"], poly.edge2["index"])
-
-    shed[mask] = True
-
-    filename = os.path.join(
-        "data",
-        "NHD_H_0208_HU4_Shape", "Shape", "WBDHU4.shp")
 
     loadshp(filename, poly)
 
@@ -294,5 +264,16 @@ def setspac():
 
     spac.slope = \
         np.empty((+0), dtype=spac.REALS_t)
+
+#------------------------------------ proj. to local 2-plane
+    proj = jigsawpy.jigsaw_prj_t()
+    proj.prjID = "stereographic"
+    proj.radii = FULL_SPHERE_RADIUS
+    proj.xbase = PROJ_CENTRE[0] * np.pi / +180.
+    proj.ybase = PROJ_CENTRE[1] * np.pi / +180.
+
+    jigsawpy.project(spac, proj, "fwd")
+
+    SPAC[0] = spac                      # save a "pointer"
 
     return spac

@@ -6,4 +6,4 @@ A "boundary-constrained" Delaware-centric configuration, adding various watershe
     python meshify.py --mesh-path="mesh/delaware_60_30_5_2_w_boundary"
     conda deactivate
 
-will build the mesh in the `../delaware_60_30_5_2_w_boundary` directory. Output in `../delaware_60_30_5_2_w_boundary/out`. Requires the `../delaware_60_30_5_2` configuration to first be run, to be used as initial conditions. 
+will build the mesh in the `../delaware_60_30_5_2_w_boundary` directory. Output is written to `../delaware_60_30_5_2_w_boundary/out`. Requires the `../delaware_60_30_5_2` configuration to first be run, to be used as initial conditions. 

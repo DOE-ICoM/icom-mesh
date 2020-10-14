@@ -2,8 +2,6 @@
 *.log
 *.jig
 *.msh
-*.vtk
-*.dat
 
 # python things
 __pycache__/
@@ -23,3 +21,10 @@ var/
 # data files, etc
 data/*
 !data/.keep
+*.nc
+*.vtk
+*.vtp
+*.dat
+*.info
+*.geojson
+*.shp

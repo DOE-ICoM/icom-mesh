@@ -6,4 +6,4 @@ A "vanilla" quasi-uniform (50km) global configuration. Nothing fancy, no variabl
     python meshify.py --mesh-path="mesh/vanilla_50"
     conda deactivate
 
-will build the mesh in the `../vanilla_50` directory. Output in `../vanilla_50/out`. No data dependencies.
+will build the mesh in the `../vanilla_50` directory. Output is written to `../vanilla_50/out`. No data dependencies.
