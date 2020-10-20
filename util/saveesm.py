@@ -7,7 +7,8 @@ import xarray
 
 from geometric_features import GeometricFeatures
 
-from util.mpasmsh import jigsaw_mesh_to_netcdf, inject_edge_tags
+from util.mpasmsh import jigsaw_mesh_to_netcdf, inject_edge_tags, \
+    subtract_critical_passages, mask_reachable_ocean
 
 from mpas_tools.mesh.conversion import convert, mask, cull
 from mpas_tools.io import write_netcdf
@@ -15,8 +16,7 @@ from mpas_tools.ocean.inject_preserve_floodplain import \
     inject_preserve_floodplain
 from mpas_tools.ocean.coastline_alteration import \
     widen_transect_edge_masks, add_critical_land_blockages, \
-    add_land_locked_cells_to_mask, subtract_critical_passages, \
-    mask_reachable_ocean
+    add_land_locked_cells_to_mask
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
