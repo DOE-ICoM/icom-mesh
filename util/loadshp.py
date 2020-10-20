@@ -25,9 +25,8 @@ def coreshp(data, nset, eset, nobj, last):
     """
     CORESHP: load a shape file into a jigsaw msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     if (nlevels(data) > +1):
 
@@ -74,9 +73,8 @@ def loadshp(name, mesh, filt=None):
     """
     LOADSHP: load a shape file into a jigsaw msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     if (not isinstance(name, str)):
         raise Exception("Incorrect type: NAME.")

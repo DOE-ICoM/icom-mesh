@@ -30,9 +30,8 @@ def meshify(mesh_path="mesh/vanilla_100",
     3. (Optionally) export compatible FVCOM and ATS outputs.
     4. Call MPAS meshtools to make the MPAS mesh data files.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     class obj(object): pass                 # dummy object
 
@@ -55,8 +54,7 @@ def meshify(mesh_path="mesh/vanilla_100",
 #-------------------------------------- write output for ATS
         mout = zipmesh(mprj, idtag_ats)
 
-    #   saveats(os.path.join(
-    #       mesh_path, "out", "mesh_ats"), mout)
+        saveats(mesh_path, mout)
 
     if (isinstance(idtag_fvc, list) and len(idtag_fvc) > 0
             and idtag_fvc[0] >= +0):
@@ -64,8 +62,7 @@ def meshify(mesh_path="mesh/vanilla_100",
 #-------------------------------------- write output for FVC
         mout = zipmesh(mprj, idtag_fvc)
 
-    #   savefvc(os.path.join(
-    #       mesh_path, "out", "mesh_fvc"), mout)
+    #   savefvc(mesh_path, mout)
 
 #---------- run MPAS meshtools to build MPAS data-structures
 
@@ -105,9 +102,8 @@ def runjgsw(mesh_path, make_bool, projector):
 
     Returns full-dimensional and 2d-projected msh_t objects.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     mesh = jigsawpy.jigsaw_msh_t()
     mprj = jigsawpy.jigsaw_msh_t()
@@ -287,9 +283,8 @@ def project(geom, mesh, gprj, mprj, pmid):
 
     Modifies GPRJ, MPRJ objects "inplace".
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     proj = jigsawpy.jigsaw_prj_t()
 
@@ -318,9 +313,8 @@ def tagcell(geom, mesh, gprj, mprj, itag):
 
     Modifies MESH, MPRJ objects "inplace".
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     this = geom.bound["IDtag"] == itag
     cell = geom.bound["index"][this]
@@ -372,9 +366,8 @@ def zipmesh(mesh, tags):
 
     Returns a new "zipped" msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     mout = jigsawpy.jigsaw_msh_t()
 

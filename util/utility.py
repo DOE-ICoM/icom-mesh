@@ -13,9 +13,8 @@ def addpoly(geom, poly, itag):
     and a new "loop" added to GEOM.BOUND. This new loop is
     assigned ID = ITAG.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     temp = jigsawpy.jigsaw_msh_t()
 
@@ -52,14 +51,15 @@ def addline(geom, line, itag):
     The LINE.POINT + LINE.EDGE2 arrays are appended to GEOM.
     The new edges are assigned ID = ITAG.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     temp = jigsawpy.jigsaw_msh_t()
 
     temp.point = line.point
     temp.edge2 = line.edge2
+
+    temp.edge2["IDtag"] = itag
 
     zipmesh(temp)                       # ensure compressed
 
@@ -78,9 +78,8 @@ def zipmesh(mesh):
     ZIPMESH: "zip" a mst_t obj., pruning any unused points /
     cells, and compressing cell indexing.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     used = np.full(
         mesh.point.size, False, dtype=bool)
@@ -140,9 +139,8 @@ def innerto(vert, geom):
     INNERTO: return ID-tags of polygons enclosing each point
     in VERT. Return -1 for exterior points.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     itag = np.full(
         vert.shape[+0], -1, dtype=np.int32)

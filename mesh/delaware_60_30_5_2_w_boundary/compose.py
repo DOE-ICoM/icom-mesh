@@ -4,12 +4,12 @@ import time
 import copy
 import numpy as np
 import jigsawpy
+from mpas_tools.cime.constants import constants
 import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 
 from util.loadshp import loadshp
 from util.spacing import zipnear
 from util.utility import addpoly, addline, innerto
-
 
 """
 DELAWARE-60-30-5-2-w-boundary: like DELAWARE-60-30-5-2, but
@@ -20,9 +20,8 @@ with boundary constraints (watersheds, rivers, etc) imposed:
     - 5.km (Delaware, etc watersheds)
     - 2.km (Delaware coastline + PFZ)
 
-Authors: Darren Engwirda
-
 """
+# Authors: Darren Engwirda
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TDIR = os.path.join(HERE, "tmp")
@@ -31,7 +30,7 @@ ODIR = os.path.join(HERE, "out")
 GEOM = [jigsawpy.jigsaw_msh_t()]
 SPAC = [jigsawpy.jigsaw_msh_t()]
 
-FULL_SPHERE_RADIUS = +6.371E+003
+FULL_SPHERE_RADIUS = constants["SHR_CONST_REARTH"] / 1.E+003
 
 
 def filt_narivs(feat):
@@ -120,7 +119,7 @@ def setgeom():
     ))
     poly.edge2 = poly.edge2[keep]
 
-    addline(geom, poly, +0)
+    addline(geom, poly, +1)
 
     GEOM[0] = geom                      # save a "pointer"
 

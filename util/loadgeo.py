@@ -10,9 +10,8 @@ def linegeo(line, nset, eset, nobj, last):
     """
     LINEGEO: read a geoJSON line into a jigsaw msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     npts = len(line) - 0
 
@@ -47,9 +46,8 @@ def polygeo(loop, nset, eset, nobj, last):
     """
     POLYGEO: read a geoJSON poly into a jigsaw msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     npts = len(loop) - 1
 
@@ -94,9 +92,8 @@ def readgeo(geom, nset, eset, nobj, last):
     """
     READGEO: read a geoJSON part into a jigsaw msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     if   (geom["type"] == "LineString"):
 
@@ -134,9 +131,8 @@ def loadgeo(name, mesh):
     """
     LOADGEO: load a geoJSON file into a jigsaw msh_t object.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     if (not isinstance(name, str)):
         raise Exception("Incorrect type: NAME.")

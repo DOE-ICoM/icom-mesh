@@ -1,16 +1,15 @@
 
 import numpy as np
-
 import jigsawpy
+from mpas_tools.cime.constants import constants
 
 """
 VANILLA-100: "vanilla" quasi-uniform global config., h=100km
 
-Authors: Darren Engwirda
-
 """
+# Authors: Darren Engwirda
 
-FULL_SPHERE_RADIUS = +6.371E+003
+FULL_SPHERE_RADIUS = constants["SHR_CONST_REARTH"] / 1.E+003
 
 
 def setgeom():

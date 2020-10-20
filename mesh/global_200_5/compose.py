@@ -1,17 +1,18 @@
 
 import numpy as np
 import jigsawpy
-import mpas_tools.mesh.creation.mesh_definition_tools as mdt
+from mpas_tools.cime.constants import constants
 
 """
-GLOBAL-30-10: the "Rossby-radius" configuration - 30-to-10km.
-    - RRS-30-to-10km (global ocean)
-
-Authors: Darren Engwirda
+GLOBAL-200-5: Quasi-uniform global config. with mid-Atlantic
+focused regional refinement:
+    - 200km (global ocean)
+    - 5km halo in the mid-Atlantic
 
 """
+# Authors: Darren Engwirda
 
-FULL_SPHERE_RADIUS = +6.371E+003
+FULL_SPHERE_RADIUS = constants["SHR_CONST_REARTH"] / 1.E+003
 
 
 def setgeom():
@@ -50,12 +51,12 @@ def setopts():
 
     opts.mesh_dims = +2                 # 2-dim. simplexes
 
-    opts.bisection = -1                 # call heutristic!
+    opts.bisection = +5                 # call heutristic!
 
 #   opts.optm_kern = "cvt+dqdx"
 
     opts.optm_qlim = +9.5E-01           # tighter opt. tol
-    opts.optm_iter = 64
+    opts.optm_iter = +64
     opts.optm_qtol = +1.0E-05
 
     return opts
@@ -67,20 +68,24 @@ def setspac():
 
 #------------------------------------ define spacing pattern
 
+    xmid = -76.5 * np.pi / 180.0
+    ymid = +39.5 * np.pi / 180.0
+
     spac.mshID = "ellipsoid-grid"
     spac.radii = np.full(
         3, FULL_SPHERE_RADIUS, dtype=spac.REALS_t)
 
     spac.xgrid = np.linspace(
-        -1. * np.pi, +1. * np.pi, 360)
+        -1. * np.pi, +1. * np.pi, 720)
 
     spac.ygrid = np.linspace(
-        -.5 * np.pi, +.5 * np.pi, 181)
+        -.5 * np.pi, +.5 * np.pi, 361)
 
-    vals = mdt.RRS_CellWidthVsLat(
-        spac.ygrid * 180. / np.pi, 30., 10.)
+    xmat, ymat = \
+        np.meshgrid(spac.xgrid[:] , spac.ygrid[:])
 
-    spac.value = np.array(np.tile(
-        vals, (1, spac.xgrid.size)), dtype=spac.REALS_t)
+    spac.value = +200. - 195. * np.exp(-(
+        +12.5 * (xmat - xmid) ** 2 +
+        +20.0 * (ymat - ymid) ** 2) ** 2)
 
     return spac
