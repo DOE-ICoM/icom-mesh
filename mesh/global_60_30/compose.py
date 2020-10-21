@@ -1,17 +1,17 @@
 
 import numpy as np
 import jigsawpy
+from mpas_tools.cime.constants import constants
 import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 
 """
 GLOBAL-60-30: the "eddy-closure" configuration - 60-to-30km.
     - EC-60-to-30km (global ocean)
 
-Authors: Darren Engwirda
-
 """
+# Authors: Darren Engwirda
 
-FULL_SPHERE_RADIUS = +6.371E+003
+FULL_SPHERE_RADIUS = constants["SHR_CONST_REARTH"] / 1.E+003
 
 
 def setgeom():

@@ -12,9 +12,8 @@ def sphdist(rsph, xone, yone, xtwo, ytwo):
     SPHDIST: return the distance from the points [XONE,YONE]
     to the point [XONE,YONE] on a sphere of radii RSPH.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     dlon = .5 * (xone - xtwo)
     dlat = .5 * (yone - ytwo)
@@ -32,9 +31,8 @@ def rd_dist(xone, xtwo):
     RD_DIST: return the distance between the points XONE and
     XTWO in R^D. Points are N-by-D arrays.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     return np.sqrt(np.sum((xtwo - xone) ** 2, axis=1, 
                           keepdims=True))
@@ -48,9 +46,8 @@ def blender(val1, val2, dist, blen, bgap):
     TANH((DIST-LEN) ./ GAP) weighting is used -- blending is
     centred about DIST=LEN and spans an approx. width of GAP.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     beta = .5 + .5 * np.tanh(
         np.pi * (dist - blen) / bgap)
@@ -66,9 +63,8 @@ def R3toS2(radii, E3):
     with the projected points then transformed to [LON,LAT]
     pairs. 
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
     
     PP = .5 * E3
 
@@ -119,9 +115,8 @@ def zipnear(init, geom, spac, near=10.0):
 
     The INIT. object is modified in-place.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
 #------------------------------------ subdiv. geom. for H(x)
 
@@ -187,9 +182,8 @@ def divgeom(geom, spac):
 
     The GEOM. object is modified in-place.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     kind = geom.mshID.lower()
 

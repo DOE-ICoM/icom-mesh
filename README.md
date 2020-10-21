@@ -12,7 +12,9 @@ The "unified" multi-model meshing workflow.
     
 Dependencies can either be built directly from src, or installed using the <a href="https://anaconda.org/conda-forge/">`conda`</a> package manager (highly recommended!):
 
-    conda create -n icom_mesh_plus python=3.7 netCDF4 scipy geojson githubrelease mpas_tools jigsaw jigsawpy
+    conda create -n icom_mesh_plus python=3.7 netCDF4 scipy geojson fiona mpas_tools jigsaw jigsawpy
+
+It's also necessary to install `githubrelease` via: `pip install githubrelease`.
 
 Data files can be downloaded from the <a href="https://github.com/DOE-ICoM/icom-mesh-data">`ICoM-MESH-DATA`</a> repository using the `extract.py` utility. Assets are unpacked into the local `../data` directory.
 

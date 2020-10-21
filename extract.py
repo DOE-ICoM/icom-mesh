@@ -11,9 +11,9 @@ def extract(repo="DOE-ICoM/icom-mesh-data", vtag="v0.1.0"):
     """
     EXTRACT: download and unpack data assets for icom-mesh.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
+
     cwd_pointer = os.getcwd()
 
     try:

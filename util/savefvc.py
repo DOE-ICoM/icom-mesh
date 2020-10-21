@@ -14,6 +14,7 @@ def in_tri2(ppos, tri2, test, rtol):
     if TEST lies "inside" the I-TH triangle.
 
     """
+    # Authors: Darren Engwirda
 
     TEST = np.tile(test, (tri2.shape[0], 1))
 
@@ -51,9 +52,8 @@ def cullfvc(mesh, seed):
 
     Any edge elements defined in MESH are also culled-away.
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     certify(mesh)
 
@@ -160,6 +160,7 @@ def save_mesh_file(mesh, fptr):
     SAVE-MESH-FILE: save a JIGSAW mesh object to *.DAT file.
 
     """
+    # Authors: Darren Engwirda
 
     if (mesh.vert2 is not None):
         xpts = mesh.vert2["coord"]
@@ -221,6 +222,7 @@ def save_grid_file(mesh, fptr):
     SAVE-GRID-FILE: save a JIGSAW mesh object to *.DAT file.
 
     """
+    # Authors: Darren Engwirda
 
     if (mesh is not None):
         warnings.warn(
@@ -241,9 +243,8 @@ def savefvc(name, mesh):
     Data in MESH is written as-needed -- any objects defined
     will be saved to file (if supported).
 
-    Authors: Darren Engwirda
-
     """
+    # Authors: Darren Engwirda
 
     if (not isinstance(name, str)):
         raise Exception("Incorrect type: NAME.")

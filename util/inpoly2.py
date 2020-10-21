@@ -56,11 +56,9 @@ def inpoly2(vert, node, edge=None, ftol=5.0e-14):
     of calls to the (relatively) expensive edge intersection
     test.
 
-    Updated: 26 September, 2020
-
-    Authors: Darren Engwirda, Keith Roberts
-
     """
+    # Updated: 26 September, 2020
+    # Authors: Darren Engwirda, Keith Roberts
 
     vert = np.asarray(vert, dtype=np.float64)
     node = np.asarray(node, dtype=np.float64)

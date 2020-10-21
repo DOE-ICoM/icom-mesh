@@ -7,14 +7,11 @@ import xarray
 
 from geometric_features import GeometricFeatures
 
-from scipy.spatial import distance
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import connected_components
+from util.mpasmsh import jigsaw_mesh_to_netcdf, inject_edge_tags, \
+    subtract_critical_passages, mask_reachable_ocean
 
 from mpas_tools.mesh.conversion import convert, mask, cull
 from mpas_tools.io import write_netcdf
-from mpas_tools.mesh.creation.jigsaw_to_netcdf import jigsaw_to_netcdf
-from mpas_tools.ocean.inject_bathymetry import inject_bathymetry
 from mpas_tools.ocean.inject_preserve_floodplain import \
     inject_preserve_floodplain
 from mpas_tools.ocean.coastline_alteration import \
@@ -24,134 +21,10 @@ from mpas_tools.ocean.coastline_alteration import \
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 
-
-#!! these should move to mpas_tools.ocean.coastline_alteration
-
-def subtract_critical_passages(dsMask, dsPassages):
-    '''
-    Parameters
-    ----------
-    dsMask : `xarray.Dataset`
-        The mask to which critical passages should be added
-    dsPassages : `xarray.Dataset`
-        The transect masks defining critical passages to be kept open for
-        ocean flow
-
-    Returns
-    -------
-    dsMask : `xarray.Dataset`
-        The mask with critical passages included
-    '''
-
-    dsMask = dsMask.copy()
-
-    nTransects = dsPassages.sizes["nTransects"]
-    for transectIndex in range(nTransects):
-        index = dsPassages.transectCellMasks[:, transectIndex] > 0
-        dsMask.regionCellMasks[index, 0] = 0
-
-    return dsMask
-
-def mask_reachable_ocean(dsMesh, dsMask, fcSeed):
-    '''
-    Return a new land mask that ensures all ocean cells are "reachable" from
-    (at least) one of the ocean points. Isolated patches of ocean cells will 
-    be added to the land mask.
-
-    Parameters
-    ----------
-    dsMesh : `xarray.Dataset`
-        The unculled base mesh object to which the land mask is applied.
-
-    dsMask : `xarray.Dataset`
-        The current land mask.
-
-    fcSeed : `geometric_features.FeatureCollection`
-        A set of "seed" points associated with the ocean domain. Used to
-        determine which cells in the ocean mesh are "unreachable" wrt. the 
-        land mask via a flood-fill. 
-
-    Returns
-    -------
-    dsMask : `xarray.Dataset`
-        The updated land mask, with the set of unreachable ocean cells added.
-    '''
-
-    dsMask = dsMask.copy()
-
-    cellMasks = np.array(dsMask.regionCellMasks[:, 0])
-
-    nCells = dsMesh.sizes["nCells"]
-
-    # a sparse matrix representation of masked cell-to-cell connectivity
-    iNext = +0
-    iPtrs = np.zeros(nCells + 1, dtype=int)
-    xData = np.zeros(
-        nCells * dsMesh.sizes["maxEdges"], dtype=int)
-    iCols = np.zeros(
-        nCells * dsMesh.sizes["maxEdges"], dtype=int)
-    
-    countOnCell = np.array(dsMesh.nEdgesOnCell)
-    cellsOnCell = np.array(dsMesh.cellsOnCell)
-
-    # add graph edges between adjacent cells as long as they share common 
-    # mask entries
-    for iCell in range(nCells):
-        for iEdge in range(countOnCell[iCell]):
-            iPair = cellsOnCell[iCell, iEdge] - 1
-            if (cellMasks[iCell] == cellMasks[iPair]):
-                xData[iNext] = +1
-                iCols[iNext] = iPair
-                iNext = iNext + 1
-
-        iPtrs[iCell + 1] = iNext
-
-    xData.resize((iPtrs[nCells]))
-    iCols.resize((iPtrs[nCells]))
-
-    spMesh = csr_matrix((xData, iCols, iPtrs), dtype=int)
-
-    # find "connected" parts of masked mesh, as the connected components of 
-    # the masked cell-to-cell matrix
-    nLabel, labels = connected_components(
-        csgraph=spMesh, directed=False, return_labels=True)
-
-    # set seedMasks = +1 for the cells closest to any "seed" points defined 
-    # for the ocean
-    seedMasks = np.zeros(nCells, dtype=int)  
-    cellCoord = \
-        np.vstack((dsMesh.lonCell, dsMesh.latCell)).T
-
-    for feature in fcSeed.features:
-        point = feature["geometry"]["coordinates"]
-        
-        point[0] = point[0] * np.pi / +180.
-        point[1] = point[1] * np.pi / +180.
-
-        index = distance.cdist([point], cellCoord).argmin()
-
-        if (cellMasks[index] == 0):
-            seedMasks[index] = +1
-
-    # reset the land mask: mark all cells in any component that contains an
-    # ocean point as 0
-    dsMask.regionCellMasks[:, 0] = +1
-
-    for iLabel in range(nLabel):
-        labelMasks = seedMasks[labels == iLabel]
-        if (np.any(labelMasks > +0)):
-            dsMask.regionCellMasks[labels == iLabel, 0] = 0
-    
-    return dsMask
-
-
-
-
 def saveesm(path, geom, mesh,
             preserve_floodplain=False,
             floodplain_elevation=20.0,
             do_inject_elevation=False,
-            elevation_filename="",
             with_cavities=False,
             lat_threshold=43.00,
             with_critical_passages=True):
@@ -159,12 +32,13 @@ def saveesm(path, geom, mesh,
     SAVEESM: export a jigsaw mesh obj. to MPAS-style output.
 
     1. Writes "mesh_triangles.nc" and "base_mesh.nc" files.
-    2. (Optionally) injects elevation + floddplain data.
-    3. (Optionally) export compatible FVCOM and ATS outputs.
-    4. Calls MPAS-Tools + Geometric-Data to cull mesh into 
+    2. (Optionally) injects elevation + floodplain data.
+    3. Calls MPAS-Tools + Geometric-Data to cull mesh into 
        ocean/land partitions.
-    5. Writes "culled_mesh.nc" (ocean) and "invert_mesh.nc"
+    4. Writes "culled_mesh.nc" (ocean) and "invert_mesh.nc"
        (land) MPAS-spec. output files.
+
+    Data is written to "../path/out/" and/or "../path/tmp/".
 
     """
     # Authors: Darren Engwirda
@@ -174,24 +48,24 @@ def saveesm(path, geom, mesh,
     print("")
     print("Running MPAS mesh-tools...")
 
-    # adapted from BUILD_MESH.py
+    inject_edge_tags(mesh)
 
+    # adapted from BUILD_MESH.py
+    
     if (geom.mshID.lower() == "ellipsoid-mesh"):
         print("Forming mesh_triangles.nc")
-        jigsaw_to_netcdf(
+        jigsaw_mesh_to_netcdf(
+            mesh=mesh,
             on_sphere=True,
-            sphere_radius=np.mean(geom.radii),
-            msh_filename=os.path.join(
-                path, "tmp", "mesh.msh"),
+            sphere_radius=np.mean(geom.radii) * 1e3,
             output_name=os.path.join(
                 path, "tmp", "mesh_triangles.nc"))
 
     if (geom.mshID.lower() == "euclidean-mesh"):
         print("Forming mesh_triangles.nc")
-        jigsaw_to_netcdf(
+        jigsaw_mesh_to_netcdf(
+            mesh=mesh,
             on_sphere=False,
-            msh_filename=os.path.join(
-                path, "tmp", "mesh.msh"),
             output_name=os.path.join(
                 path, "tmp", "mesh_triangles.nc"))
 
@@ -203,16 +77,20 @@ def saveesm(path, geom, mesh,
         fileName=os.path.join(
             path, "out", "base_mesh.nc"))
 
+    """
     if do_inject_elevation:
         print("Injecting cell elevations")
-        inject_bathymetry(
-            mesh_file="base_mesh.nc", 
-            bathymetry_file=elevation_filename)
+        inject_elevation(
+            cell_elev=mesh.value,
+            mesh_file=os.path.join(
+                path, "out", "base_mesh.nc"))
+    """
 
     if preserve_floodplain:
         print("Injecting floodplain flag")
         inject_preserve_floodplain(
-            mesh_file="base_mesh.nc",
+            mesh_file=os.path.join(
+                path, "out", "base_mesh.nc"),
             floodplain_elevation=floodplain_elevation)
 
     args = ["paraview_vtk_field_extractor.py",
@@ -234,7 +112,7 @@ def saveesm(path, geom, mesh,
     netcdfFormat = "NETCDF3_64BIT"
 
     gf = GeometricFeatures(
-        cacheLocation='{}'.format(os.path.join(
+        cacheLocation="{}".format(os.path.join(
             HERE, "..", "data", "geometric_data")))
 
     # start with the land coverage from Natural Earth
@@ -389,5 +267,10 @@ def saveesm(path, geom, mesh,
     ttoc = time.time()
 
     print("CPUSEC =", (ttoc - ttic))
+
+    return
+
+
+def inject_elevation(mesh_file):
 
     return

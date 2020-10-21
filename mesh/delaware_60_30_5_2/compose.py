@@ -5,13 +5,13 @@ import numpy as np
 from scipy.ndimage import median_filter
 import netCDF4 as nc
 import jigsawpy
+from mpas_tools.cime.constants import constants
 import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 
 from util.loadshp import loadshp
 from util.loadgeo import loadgeo
 from util.inpoly2 import inpoly2
 from util.spacing import sphdist, blender
-
 
 """
 DELAWARE-60-30-5-2: a variable-res. Delaware config., inc.:
@@ -21,15 +21,14 @@ DELAWARE-60-30-5-2: a variable-res. Delaware config., inc.:
     - 5.km (Delaware, etc watersheds)
     - 2.km (Delaware coastline + PFZ)
 
-Authors: Darren Engwirda
-
 """
+# Authors: Darren Engwirda
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TDIR = os.path.join(HERE, "tmp")
 ODIR = os.path.join(HERE, "out")
 
-FULL_SPHERE_RADIUS = +6.371E+003
+FULL_SPHERE_RADIUS = constants["SHR_CONST_REARTH"] / 1.E+003
 
 
 def setgeom():
