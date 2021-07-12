@@ -1,4 +1,5 @@
 
+import copy
 import numpy as np
 from scipy import spatial
 from scipy import interpolate
@@ -34,8 +35,154 @@ def rd_dist(xone, xtwo):
     """
     # Authors: Darren Engwirda
 
-    return np.sqrt(np.sum((xtwo - xone) ** 2, axis=1, 
+    return np.sqrt(np.sum((xtwo - xone) ** 2, axis=1,
                           keepdims=True))
+
+
+def dist_to(grid, poly):
+    """
+    DIST-TO: return the (geodesic) dist. from the mst_t obj.
+    GRID to the polyline obj. POLY.
+
+    """
+    # Authors: Darren Engwirda
+
+    opts = jigsawpy.jigsaw_jig_t()
+    near = jigsawpy.jigsaw_msh_t()
+
+    dist = copy.deepcopy(grid)
+    geom = copy.deepcopy(poly)
+
+    if (grid.mshID.lower() == "euclidean-grid" and
+            grid.zgrid.size == 0):
+#------------------------------------ find dist. to geo: E^d
+        spacing(grid, near)
+
+        divgeom(geom, near)
+
+        tree = spatial.cKDTree(geom.point["coord"])
+
+        xgrd, ygrd = \
+            np.meshgrid(dist.xgrid, dist.ygrid)
+
+        xpos = np.vstack(
+            (xgrd.flatten(), ygrd.flatten())).T
+
+        xmin = np.min(xpos, axis=0)
+        xmax = np.max(xpos, axis=0)
+
+        smax = np.max(near.value)
+
+        dval, _ = tree.query(
+            xpos, distance_upper_bound=smax * 1.5)
+
+        dist.slope = np.ones((
+            dist.ygrid.size, dist.xgrid.size))
+
+        dist.value = \
+            np.reshape(dval, dist.slope.shape)
+
+        dist.value = np.minimum(
+            dist.value, np.sum(xmax[:] - xmin[:]))
+
+    if (grid.mshID.lower() == "euclidean-grid" and
+            grid.zgrid.size != 0):
+#------------------------------------ find dist. to geo: E^d
+        spacing(grid, near)
+
+        divgeom(geom, near)
+
+        tree = spatial.cKDTree(geom.point["coord"])
+
+        xgrd, ygrd, zgrd = np.meshgrid(
+            dist.xgrid, dist.ygrid, dist.zgrid)
+
+        xpos = np.vstack((
+            xgrd.flatten(), 
+            ygrd.flatten(), zgrd.flatten())).T
+
+        xmin = np.min(xpos, axis=0)
+        xmax = np.max(xpos, axis=0)
+
+        smax = np.max(near.value)
+
+        dval, _ = tree.query(
+            xpos, distance_upper_bound=smax * 1.5)
+
+        dist.slope = np.ones((
+            dist.ygrid.size, dist.xgrid.size))
+
+        dist.value = \
+            np.reshape(dval, dist.slope.shape)
+
+        dist.value = np.minimum(
+            dist.value, np.sum(xmax[:] - xmin[:]))
+
+    if (grid.mshID.lower() == "euclidean-mesh"):
+#------------------------------------ find dist. to geo: E^d
+        spacing(grid, near)
+
+        divgeom(geom, near)
+
+        tree = spatial.cKDTree(geom.point["coord"])
+
+        xpos = grid.point["coord"]
+
+        xmin = np.min(xpos, axis=0)
+        xmax = np.max(xpos, axis=0)
+
+        smax = np.max(near.value)
+
+        dval, _ = tree.query(
+            xpos, distance_upper_bound=smax * 1.5)
+
+        dist.slope = np.ones(xpos.shape[0])
+
+        dist.value = \
+            np.reshape(dval, dist.slope.shape)
+
+        dist.value = np.minimum(
+            dist.value, np.sum(xmax[:] - xmin[:]))
+
+    if (grid.mshID.lower() == "ellipsoid-grid"):
+#------------------------------------ find dist. to geo: S^2
+        spacing(grid, near)
+
+        divgeom(geom, near)
+
+        tree = spatial.cKDTree(
+            jigsawpy.S2toR3(
+                geom.radii, geom.point["coord"]))
+
+        xgrd, ygrd = \
+            np.meshgrid(dist.xgrid, dist.ygrid)
+
+        xpos = np.vstack(
+            (xgrd.flatten(), ygrd.flatten())).T
+
+        xpos = jigsawpy.S2toR3(grid.radii, xpos)
+
+        smax = np.max(near.value)
+
+        dval, _ = tree.query(
+            xpos, distance_upper_bound=smax * 1.5)
+
+        dist.slope = np.ones((
+            dist.ygrid.size, dist.xgrid.size))
+
+        dist.value = \
+            np.reshape(dval, dist.slope.shape)
+
+        dist.value = np.minimum(
+            dist.value, np.mean(grid.radii) * 8.0)
+
+#-- solve |grad(d)| = 1, via jigsaw's fast-marching approach
+#-- returns dist.value as (a PDE-based approximation) to the 
+#-- geodesic distance
+
+    jigsawpy.lib.marche(opts, dist)
+
+    return dist.value
 
 
 def blender(val1, val2, dist, blen, bgap):
@@ -119,36 +266,48 @@ def zipnear(init, geom, spac, near=10.0):
     # Authors: Darren Engwirda
 
 #------------------------------------ subdiv. geom. for H(x)
-
     divgeom(geom, spac)
 
-#------------------------------------ find dist. to geometry
+    if (geom.mshID.lower() == "ellipsoid-mesh"):
 
-    tree = spatial.cKDTree(
-        jigsawpy.S2toR3(
-            geom.radii, geom.point["coord"]))
+#------------------------------------ find dist. to geo: S^2
+        xpos = jigsawpy.R3toS2(
+            geom.radii, init.point["coord"][:])        
 
-    dmax = np.max(spac.value) * near
+        tree = spatial.cKDTree(
+            jigsawpy.S2toR3(
+                geom.radii, geom.point["coord"]))
 
-    dist, _ = tree.query(
-        init.point["coord"],
-        eps=0.0, distance_upper_bound=dmax)
+        dmax = np.max(spac.value) * near
 
-    apos = jigsawpy.R3toS2(
-        geom.radii, init.point["coord"][:])
+        dist, _ = tree.query(
+            init.point["coord"],
+            eps=0.0, distance_upper_bound=dmax)
+
+    if (geom.mshID.lower() == "euclidean-mesh"):
+
+#------------------------------------ find dist. to geo: E^d
+        xpos = init.point["coord"][:]        
+
+        tree = spatial.cKDTree(
+            geom.point["coord"])
+
+        dmax = np.max(spac.value) * near
+
+        dist, _ = tree.query(
+            init.point["coord"],
+            eps=0.0, distance_upper_bound=dmax)
 
 #------------------------------------ zip init. if too close
-
     hfun = interpolate.RectBivariateSpline(
         spac.ygrid, spac.xgrid, spac.value)
 
     hval = hfun(
-        apos[:, 1], apos[:, 0], grid=False)
+        xpos[:, 1], xpos[:, 0], grid=False)
 
     keep = dist >= hval * near
 
 #------------------------------------ re-index init. for zip
-
     if (init.edge2 is not None and
             init.edge2.size > +0):
 
@@ -170,6 +329,18 @@ def zipnear(init, geom, spac, near=10.0):
 
         init.tria3 = init.tria3[mask]
 
+    if (init.quad4 is not None and
+            init.quad4.size > +0):
+
+        mask = np.logical_and.reduce((
+            keep[init.quad4["index"][:, 0]],
+            keep[init.quad4["index"][:, 1]],
+            keep[init.quad4["index"][:, 2]],
+            keep[init.quad4["index"][:, 3]]
+        ))
+
+        init.quad4 = init.quad4[mask]
+
     zipmesh(init)
 
     return
@@ -178,7 +349,10 @@ def zipnear(init, geom, spac, near=10.0):
 def divgeom(geom, spac):
     """
     DIVGEOM: subdivide the edges in the msh_t object GEOM to
-    satisfy the mesh spacing definition given by SPAC.
+    satisfy the spacing threshold SPAC.
+
+    The SPAC. param. may either be a scalar length or a full
+    mesh spacing definition (a msh_t obj).
 
     The GEOM. object is modified in-place.
 
@@ -187,21 +361,30 @@ def divgeom(geom, spac):
 
     kind = geom.mshID.lower()
 
-    hfun = interpolate.RectBivariateSpline(
-        spac.ygrid, spac.xgrid, spac.value)
+    if (not isinstance(spac, jigsawpy.jigsaw_msh_t)):
+        spac = float(spac)
+    else:
+        if ("-grid" not in spac.mshID.lower()):
+            raise Exception(
+                "Unsupported SPAC.MSHID type")
 
+        hfun = interpolate.RectBivariateSpline(
+            spac.ygrid, spac.xgrid, spac.value)
+    
     while True:                             # while too long
 
         vert = geom.point["coord"]
         cell = geom.edge2["index"]
 
     #-------------------------------- eval. spacing at nodes
-
-        hval = hfun(
-            vert[:, 1], vert[:, 0], grid=False)
+        if (isinstance(spac, float)):
+            hval = np.full(
+                (vert.shape[0]), spac, dtype=float)
+        else:
+            hval = hfun(
+                vert[:, 1], vert[:, 0], grid=False)
 
     #-------------------------------- eval. edge length, x^d
-
         if (kind == "ellipsoid-mesh"):
 
             xpos = jigsawpy.S2toR3(
@@ -237,7 +420,6 @@ def divgeom(geom, spac):
         )
 
     #-------------------------------- subdiv. edge at middle
-
         if (kind == "ellipsoid-mesh"):
 
             newx = np.zeros(
@@ -254,21 +436,19 @@ def divgeom(geom, spac):
             newx["coord"] = xmid[mask]
 
     #-------------------------------- re-index for new edges
-
         inew = np.arange(
             +0, ndiv) + geom.point.size
 
         new1 = np.empty(
             (ndiv), dtype=geom.EDGE2_t)
-        new2 = np.empty(
-            (ndiv), dtype=geom.EDGE2_t)
-
         new1["index"][:, 0] = \
             geom.edge2["index"][mask, 0]
         new1["index"][:, 1] = inew
         new1["IDtag"] = \
             geom.edge2["IDtag"][mask]
         
+        new2 = np.empty(
+            (ndiv), dtype=geom.EDGE2_t)
         new2["index"][:, 0] = inew
         new2["index"][:, 1] = \
             geom.edge2["index"][mask, 1]
@@ -278,9 +458,9 @@ def divgeom(geom, spac):
         geom.edge2[mask] = new1
 
     #-------------------------------- add new cells to GEOM.
-
         geom.point = np.concatenate(
             (geom.point, newx), axis=0)
+
         geom.edge2 = np.concatenate(
             (geom.edge2, new2), axis=0)
 

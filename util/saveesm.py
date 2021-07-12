@@ -1,13 +1,16 @@
 
+from distutils.util import strtobool
+
 import subprocess
 import os
 import time
 import numpy as np
 import xarray
+import argparse
 
 from geometric_features import GeometricFeatures
 
-from util.mpasmsh import jigsaw_mesh_to_netcdf, inject_edge_tags, \
+from util.mpasmsh import jigsaw_to_netcdf, \
     subtract_critical_passages, mask_reachable_ocean
 
 from mpas_tools.mesh.conversion import convert, mask, cull
@@ -21,24 +24,24 @@ from mpas_tools.ocean.coastline_alteration import \
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 
-def saveesm(path, geom, mesh,
+def saveesm(msh_file, out_path="",
+            on_a_sphere=True,
+            sphere_radius=1.0,
             preserve_floodplain=False,
             floodplain_elevation=20.0,
-            do_inject_elevation=False,
+            inject_elevation=True,
             with_cavities=False,
             lat_threshold=43.00,
             with_critical_passages=True):
     """
-    SAVEESM: export a jigsaw mesh obj. to MPAS-style output.
+    SAVEESM: write a jigsaw mesh to "unified" MPAS-type output.
 
     1. Writes "mesh_triangles.nc" and "base_mesh.nc" files.
     2. (Optionally) injects elevation + floodplain data.
     3. Calls MPAS-Tools + Geometric-Data to cull mesh into 
-       ocean/land partitions.
-    4. Writes "culled_mesh.nc" (ocean) and "invert_mesh.nc"
-       (land) MPAS-spec. output files.
-
-    Data is written to "../path/out/" and/or "../path/tmp/".
+       'unified' ocean/land partitions.
+    4. Writes "ocn_cull_mesh.nc" (ocean) and "lnd_cull_mesh.nc"
+       (land) MPAS-spec. output + graph files.
 
     """
     # Authors: Darren Engwirda
@@ -48,49 +51,39 @@ def saveesm(path, geom, mesh,
     print("")
     print("Running MPAS mesh-tools...")
 
-    inject_edge_tags(mesh)
+    raise Exception()
 
-    # adapted from BUILD_MESH.py
-    
-    if (geom.mshID.lower() == "ellipsoid-mesh"):
+    if (on_a_sphere):
         print("Forming mesh_triangles.nc")
-        jigsaw_mesh_to_netcdf(
-            mesh=mesh,
+        jigsaw_to_netcdf(
+            msh_file=msh_file,
             on_sphere=True,
-            sphere_radius=np.mean(geom.radii) * 1e3,
+            sphere_radius=sphere_radius,
             output_name=os.path.join(
-                path, "tmp", "mesh_triangles.nc"))
-
-    if (geom.mshID.lower() == "euclidean-mesh"):
-        print("Forming mesh_triangles.nc")
-        jigsaw_mesh_to_netcdf(
-            mesh=mesh,
-            on_sphere=False,
-            output_name=os.path.join(
-                path, "tmp", "mesh_triangles.nc"))
+                out_path, "mesh_triangles.nc"))
+    else:
+        raise Exception("Planar meshes not supported.")
 
     print("Forming base_mesh.nc")
     write_netcdf(
         convert(xarray.open_dataset(
             os.path.join(
-                path, "tmp", "mesh_triangles.nc"))),
-        fileName=os.path.join(
-            path, "out", "base_mesh.nc"))
+                out_path, "mesh_triangles.nc"))),
+        fileName=os.path.join(out_path, "base_mesh.nc"))
 
     """
-    if do_inject_elevation:
+    if inject_elevation:
         print("Injecting cell elevations")
-        inject_elevation(
-            cell_elev=mesh.value,
+        inject_elevation_data(
             mesh_file=os.path.join(
-                path, "out", "base_mesh.nc"))
+                out_path, "base_mesh.nc"), elevation_file)
     """
 
     if preserve_floodplain:
         print("Injecting floodplain flag")
         inject_preserve_floodplain(
             mesh_file=os.path.join(
-                path, "out", "base_mesh.nc"),
+                out_path, "base_mesh.nc"),
             floodplain_elevation=floodplain_elevation)
 
     args = ["paraview_vtk_field_extractor.py",
@@ -98,10 +91,8 @@ def saveesm(path, geom, mesh,
             "-l",
             "-d", "maxEdges=0",
             "-v", "allOnCells",
-            "-f", os.path.join(
-                path, "out", "base_mesh.nc"),
-            "-o", os.path.join(
-                path, "out", "base_mesh_vtk")]
+            "-f", os.path.join(out_path, "base_mesh.nc"),
+            "-o", os.path.join(out_path, "base_mesh_vtk")]
     print("")
     print("running:", " ".join(args))
     subprocess.check_call(args, env=os.environ.copy())
@@ -144,13 +135,12 @@ def saveesm(path, geom, mesh,
 
     # save the feature collection to a geojson file
     fcLandCoverage.to_geojson(
-        os.path.join(
-            path, "tmp", "land_coverage.geojson"))
+        os.path.join(out_path, "land_coverage.geojson"))
 
     # Create the land mask based on the land coverage, 
     # i.e. coastline data.
     dsBaseMesh = xarray.open_dataset(
-        os.path.join(path, "out", "base_mesh.nc"))
+        os.path.join(out_path, "base_mesh.nc"))
     dsLandMask = mask(dsBaseMesh, fcMask=fcLandCoverage)
 
     dsLandMask = add_land_locked_cells_to_mask(
@@ -211,44 +201,48 @@ def saveesm(path, geom, mesh,
     # with "preserve_floodplains", the (ocean) mesh will 
     # contain overlap with the (land) mesh, otherwise the 
     # two are "perfectly" disjoint
-        dsCulledMesh = cull(
+        ocnGraphName = \
+            os.path.join(out_path, "ocn_graph.info")
+        lndGraphName = \
+            os.path.join(out_path, "lnd_graph.info")
+
+        dsOcnMesh = cull(
             dsBaseMesh, dsMask=dsLandMask, 
             dsPreserve=dsBaseMesh,
-            graphInfoFileName=os.path.join(
-                path, "out", "culled_graph.info"))
+            graphInfoFileName=ocnGraphName)
 
-        dsInvertMesh = cull(
-            dsBaseMesh, dsInverse=dsLandMask,
-            graphInfoFileName=os.path.join(
-                path, "out", "invert_graph.info"))
+        dsLndMesh = cull(
+            dsBaseMesh, dsInverse=dsLandMask,            
+            graphInfoFileName=lndGraphName)
 
     else:
-        dsCulledMesh = cull(
-            dsBaseMesh, dsMask=dsLandMask, 
-            graphInfoFileName=os.path.join(
-                path, "out", "culled_graph.info"))
+        ocnGraphName = \
+            os.path.join(out_path, "ocn_graph.info")
+        lndGraphName = \
+            os.path.join(out_path, "lnd_graph.info")
 
-        dsInvertMesh = cull(
+        dsOcnMesh = cull(
+            dsBaseMesh, dsMask=dsLandMask,
+            graphInfoFileName=ocnGraphName)
+
+        dsLndMesh = cull(
             dsBaseMesh, dsInverse=dsLandMask,
-            graphInfoFileName=os.path.join(
-                path, "out", "invert_graph.info"))
+            graphInfoFileName=lndGraphName)
 
     write_netcdf(
-        dsCulledMesh, os.path.join(
-            path, "out", "culled_mesh.nc"), netcdfFormat)
+        dsOcnMesh, os.path.join(
+            out_path, "ocn_cull_mesh.nc"), netcdfFormat)
 
     write_netcdf(
-        dsInvertMesh, os.path.join(
-            path, "out", "invert_mesh.nc"), netcdfFormat)
+        dsLndMesh, os.path.join(
+            out_path, "lnd_cull_mesh.nc"), netcdfFormat)
 
     args = ["paraview_vtk_field_extractor.py",
             "--ignore_time",
             "-d", "maxEdges=",
             "-v", "allOnCells",
-            "-f", os.path.join(
-                path, "out", "culled_mesh.nc"),
-            "-o", os.path.join(
-                path, "out", "culled_mesh_vtk")]
+            "-f", os.path.join(out_path, "ocn_cull_mesh.nc"),
+            "-o", os.path.join(out_path, "ocn_cull_mesh_vtk")]
     print("")
     print("running", " ".join(args))
     subprocess.check_call(args, env=os.environ.copy())
@@ -257,10 +251,8 @@ def saveesm(path, geom, mesh,
             "--ignore_time",
             "-d", "maxEdges=",
             "-v", "allOnCells",
-            "-f", os.path.join(
-                path, "out", "invert_mesh.nc"),
-            "-o", os.path.join(
-                path, "out", "invert_mesh_vtk")]
+            "-f", os.path.join(out_path, "lnd_cull_mesh.nc"),
+            "-o", os.path.join(out_path, "lnd_cull_mesh_vtk")]
     print("running", " ".join(args))
     subprocess.check_call(args, env=os.environ.copy())
 
@@ -271,6 +263,56 @@ def saveesm(path, geom, mesh,
     return
 
 
-def inject_elevation(mesh_file):
+if (__name__ == "__main__"):
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawTextHelpFormatter)
 
-    return
+    parser.add_argument(
+        "--msh-file", dest="msh_file", type=str,
+        required=True, help="Path+name to jigsaw mesh file.")
+
+    parser.add_argument(
+        "--out-path", dest="out_path", type=str,
+        default="",
+        required=False, help="Output path of the MPAS mesh.")
+
+    parser.add_argument(
+        "--on-a-sphere", dest="on_a_sphere", 
+        type=lambda x: bool(strtobool(x)), default=True,
+        required=False, help="True if mesh on a sphere.")
+
+    parser.add_argument(
+        "--sphere-radius", dest="sphere_radius", type=float,
+        default=1.0,
+        required=False, help="Radius (m) of spherical mesh.")
+
+    parser.add_argument(
+        "--inject-elevation", dest="inject_elevation", 
+        type=lambda x: bool(strtobool(x)), default=True,
+        required=False, help="True to build elevation data.")
+
+    parser.add_argument(
+        "--preserve-floodplain", dest="preserve_floodplain", 
+        type=lambda x: bool(strtobool(x)), default=False,
+        required=False, help="True to inc. floodplain mask.")
+
+    parser.add_argument(
+        "--floodplain-elevation", dest="floodplain_elevation", 
+        type=float, default=20.0,
+        required=False, help="Elevation of floodplain mask.")
+
+    parser.add_argument(
+        "--with-cavities", dest="with_cavities", 
+        type=lambda x: bool(strtobool(x)), default=False,
+        required=False, help="True to build ice-shelf mask.")
+
+    args = parser.parse_args()
+
+    saveesm(msh_file=args.msh_file, out_path=args.out_path,
+            on_a_sphere=args.on_a_sphere,
+            sphere_radius=args.sphere_radius,
+            preserve_floodplain=args.preserve_floodplain,
+            floodplain_elevation=args.floodplain_elevation,
+            inject_elevation=args.inject_elevation,
+            with_cavities=args.with_cavities)

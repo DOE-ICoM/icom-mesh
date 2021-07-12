@@ -8,8 +8,9 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
 from mpas_tools.mesh.creation.util import lonlat2xyz
+from mpas_tools.io import write_netcdf
 
-from jigsawpy import jigsaw_msh_t
+from jigsawpy import jigsaw_msh_t, loadmsh
 from netCDF4 import Dataset as NetCDFFile
 from mpas_tools.mesh.creation.util import circumcenter
 
@@ -143,47 +144,18 @@ def mask_reachable_ocean(dsMesh, dsMask, fcSeed):
     return dsMask
 
 
-def inject_edge_tags(mesh):
+def jigsaw_to_netcdf(msh_file, output_name, on_sphere, sphere_radius=None):
     """
-    Injects "edge" ID-tags onto nodes, flagging MPAS cells associated
-    with (Delaunay) edge constraints. 
+    Converts mesh data defined in JIGSAW format to MPAS NetCDF format.
 
     Parameters
     ----------
-    mesh : jigsaw_msh_t
-        A JIGSAW mesh object, modified in-place.    
-
-    """
-    # Authors: Darren Engwirda
-
-    if (mesh.edge2 is not None):
-        for epos in range(mesh.edge2.size):
-
-            inod = mesh.edge2["index"][epos, 0]
-            jnod = mesh.edge2["index"][epos, 1]
-            itag = mesh.edge2["IDtag"][epos]
-
-            mesh.point["IDtag"][inod] = max(
-                itag, mesh.point["IDtag"][inod])
-            
-            mesh.point["IDtag"][jnod] = max(
-                itag, mesh.point["IDtag"][jnod])
-
-    return
-
-
-def jigsaw_mesh_to_netcdf(mesh, output_name, on_sphere, sphere_radius=None):
-    """
-    Converts mesh data defined in JIGSAW format to MPAS NetCDF format
-
-    Parameters
-    ----------
-    mesh : jigsaw_msh_t
-        A JIGSAW mesh object
+    msh_file : string
+        The name of the jigsaw input file.
     output_name: str
-        The name of the output file
+        The name of the output file.
     on_sphere : bool
-        Whether the mesh is spherical or planar
+        Whether the mesh is spherical or planar.
     sphere_radius : float, optional
         The radius of the sphere in meters.  If ``on_sphere=True`` this argument
         is required, otherwise it is ignored.
@@ -193,13 +165,19 @@ def jigsaw_mesh_to_netcdf(mesh, output_name, on_sphere, sphere_radius=None):
 
     grid = NetCDFFile(output_name, 'w', format='NETCDF3_CLASSIC')
 
+    mesh = jigsaw_msh_t()
+    loadmsh(msh_file, mesh)
+
     # Get dimensions
     # Get nCells
-    nCells = mesh.point.shape[0]
+    nCells = mesh.point.size
 
     # Get vertexDegree and nVertices
     vertexDegree = 3  # always triangles
-    nVertices = mesh.tria3.shape[0]
+    nVertices = mesh.tria3.size
+
+    # Get number of "boundary" edges
+    nBoundaries = mesh.edge2.size
 
     if vertexDegree != 3:
         ValueError('This script can only compute vertices with triangular '
@@ -207,6 +185,8 @@ def jigsaw_mesh_to_netcdf(mesh, output_name, on_sphere, sphere_radius=None):
 
     grid.createDimension('nCells', nCells)
     grid.createDimension('nVertices', nVertices)
+    grid.createDimension('nBoundaries', nBoundaries)
+    grid.createDimension('TWO', 2)
     grid.createDimension('vertexDegree', vertexDegree)
 
     # Create cell variables and sphere_radius
@@ -237,6 +217,14 @@ def jigsaw_mesh_to_netcdf(mesh, output_name, on_sphere, sphere_radius=None):
     cellsOnVertex_full = mesh.tria3['index'] + 1
     assert cellsOnVertex_full.shape == (nVertices, vertexDegree), \
         'cellsOnVertex_full is not the right shape!'
+
+    # Create bounds variables
+    cellsOnBnds_full = mesh.edge2['index'] + 1
+
+    # Create ID tag variables
+    tagsOnCell_full = mesh.point['IDtag']
+    tagsOnBnds_full = mesh.edge2['IDtag']
+    tagsOnVertex_full = mesh.tria3['IDtag']
 
     # Create vertex variables
     xVertex_full = np.zeros((nVertices,))
@@ -269,16 +257,23 @@ def jigsaw_mesh_to_netcdf(mesh, output_name, on_sphere, sphere_radius=None):
     var[:] = yCell_full
     var = grid.createVariable('zCell', 'f8', ('nCells',))
     var[:] = zCell_full
-    var = grid.createVariable('featureTagCell', 'i4', ('nCells',))
-    var[:] = mesh.point['IDtag']
     var = grid.createVariable('xVertex', 'f8', ('nVertices',))
     var[:] = xVertex_full
     var = grid.createVariable('yVertex', 'f8', ('nVertices',))
     var[:] = yVertex_full
     var = grid.createVariable('zVertex', 'f8', ('nVertices',))
     var[:] = zVertex_full
-    var = grid.createVariable('featureTagVertex', 'i4', ('nVertices',))
-    var[:] = mesh.tria3['IDtag']
+    
+    var = grid.createVariable('tagsOnCell', 'i4', ('nCells',))
+    var[:] = tagsOnCell_full
+    var = grid.createVariable('tagsOnBnds', 'i4', ('nBoundaries',))
+    var[:] = tagsOnBnds_full
+    var = grid.createVariable('tagsOnVertex', 'i4', ('nVertices',))
+    var[:] = tagsOnVertex_full
+    
+    var = grid.createVariable(
+        'cellsOnBnds', 'i4', ('nBoundaries', 'TWO',))
+    var[:] = cellsOnBnds_full
     var = grid.createVariable(
         'cellsOnVertex', 'i4', ('nVertices', 'vertexDegree',))
     var[:] = cellsOnVertex_full

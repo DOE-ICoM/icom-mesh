@@ -6,6 +6,32 @@ import argparse
 from jigsawpy import jigsaw_msh_t, savemsh
 
 
+def vertgeo(vert, nset, eset, nobj, last):
+    """
+    VERTGEO: read a geoJSON vert into a jigsaw msh_t object.
+
+    """
+    # Authors: Darren Engwirda
+
+    npts = len(vert) - 0
+
+    if (npts > 0):
+#----------------------------------------- read VERT dataset
+        temp = jigsaw_msh_t()
+        temp.vert2 = np.zeros(
+            (npts + 0), dtype=temp.VERT2_t)
+        
+        nobj = nobj + 1
+
+        last = last + npts
+
+        temp.vert2["coord"] = vert[+0::]
+
+        nset.append(temp.vert2)
+        
+    return nobj, last
+
+
 def linegeo(line, nset, eset, nobj, last):
     """
     LINEGEO: read a geoJSON line into a jigsaw msh_t object.
@@ -95,7 +121,21 @@ def readgeo(geom, nset, eset, nobj, last):
     """
     # Authors: Darren Engwirda
 
-    if   (geom["type"] == "LineString"):
+    if   (geom["type"] == "Point"):
+
+        vert = geom["coordinates"]
+
+        nobj, last = vertgeo(
+            vert, nset, eset, nobj, last)
+
+    elif (geom["type"] == "MultiPoint"):
+
+        for vert in geom["coordinates"]:
+
+            nobj, last = vertgeo(
+                vert, nset, eset, nobj, last)
+
+    elif (geom["type"] == "LineString"):
 
         line = geom["coordinates"]
 
@@ -161,8 +201,11 @@ def loadgeo(name, mesh):
                 nobj, last = readgeo(
                     next, nset, eset, nobj, last)
 
-    mesh.vert2 = np.concatenate(nset, axis=0)
-    mesh.edge2 = np.concatenate(eset, axis=0)
+    if (len(nset) > 0):
+        mesh.vert2 = np.concatenate(nset, axis=0)
+    
+    if (len(eset) > 0):
+        mesh.edge2 = np.concatenate(eset, axis=0)
 
     return
 

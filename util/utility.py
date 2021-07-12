@@ -2,7 +2,7 @@
 import numpy as np
 import jigsawpy
 
-from util.inpoly2 import inpoly2
+from inpoly import inpoly2
 
 
 def addpoly(geom, poly, itag):
