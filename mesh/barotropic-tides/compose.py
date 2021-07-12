@@ -119,17 +119,10 @@ def elev_sharpness_spacing(
 
 def compose(args):
 
-    saveesm(msh_file=opts.mesh_file, out_path=ODIR, 
-            on_a_sphere=True, 
-            sphere_radius=constants["SHR_CONST_REARTH"],
-            with_cavities=True)
-
-    raise Exception()
-
-
-
     opts = jigsawpy.jigsaw_jig_t()
     mesh = jigsawpy.jigsaw_msh_t()
+
+    args.stop_here = args.stop_here.lower()
 
     opts.geom_file = os.path.join(TDIR, "geom.msh")
     opts.jcfg_file = os.path.join(TDIR, "opts.jig")
@@ -331,13 +324,13 @@ if (__name__ == "__main__"):
         required=False, help="Filter std.-deviation: {3.000}")
 
     parser.add_argument(
-        "--ncell_slp", dest="ncell_slp", type=int,
+        "--ncell-slp", dest="ncell_slp", type=int,
         default=0,
         required=False, help="nCells per grad(elev): {0}")
 
     parser.add_argument(
-        "--ncell_wav", dest="ncell_wav", type=int,
+        "--ncell-wav", dest="ncell_wav", type=int,
         default=60,
-        required=False, help="nCells per wavelength: (60)")
+        required=False, help="nCells per wavelength: {60}")
 
     compose(parser.parse_args())

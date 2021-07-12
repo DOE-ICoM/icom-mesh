@@ -51,8 +51,6 @@ def saveesm(msh_file, out_path="",
     print("")
     print("Running MPAS mesh-tools...")
 
-    raise Exception()
-
     if (on_a_sphere):
         print("Forming mesh_triangles.nc")
         jigsaw_to_netcdf(
